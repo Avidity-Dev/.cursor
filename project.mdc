@@ -1,0 +1,66 @@
+---
+description: Review high level project information.
+globs: 
+alwaysApply: false
+---
+# HCP-HCO Matching Project
+
+## Project Overview
+This project focuses on converting an existing Python-based HCP-HCO matching algorithm into a production-ready Snowflake implementation using Snowpark. The system matches healthcare providers (HCPs) to healthcare organizations (HCOs) based on address data and affiliation information.
+
+## Project Objectives
+1. Implement the existing Python algorithm using Snowpark's Python API
+2. Enhance address geocoding using Mapbox integration
+3. Implement robust error handling and validation
+4. Create comprehensive monitoring and logging
+5. Produce high-quality, maintainable code with documentation
+
+## Domain-Specific Requirements
+1. **Data Processing**
+   - Maintain exact matching logic from original algorithm
+   - Support the same hierarchy of match types
+   - Preserve threshold values for geographical distance
+   - Handle network affiliation rules correctly
+
+2. **Technical Specifications**
+   - Optimize for Snowflake performance using Snowpark's DataFrame API
+   - Use Snowpark Python for data transformation and processing
+   - Leverage Snowpark DataFrame operations for efficient data manipulation
+   - Implement Haversine distance calculation as Snowpark UDFs
+   - Support Mapbox integration for address validation
+   - Maintain transaction integrity through Snowpark session management
+
+3. **Output Requirements**
+   - Primary affiliation table with matching reasons
+   - Backup/debug tables for audit trails
+   - HCO hierarchy resolution table
+
+## Success Criteria
+1. Results match the original Python implementation
+2. Performance meets or exceeds original implementation
+3. Error handling covers all edge cases
+4. Documentation is comprehensive
+5. Code follows best practices
+
+## Project-Specific Guidelines
+
+### Technical Architecture
+- Use Snowpark DataFrames for clear data transformation pipeline
+- Design modular Python functions with well-defined inputs/outputs
+- Implement temporary tables for intermediate processing
+- Use permanent tables only for final outputs
+- Apply proper schema design and naming conventions
+
+### Performance Considerations
+- Optimize DataFrame operations to leverage Snowflake's query optimizer
+- Minimize data movement between Snowpark and Snowflake
+- Use appropriate caching strategies
+- Implement efficient UDFs for custom logic
+
+### Testing Strategy
+- Validate against known test cases
+- Compare outputs to original Python implementation
+- Test with volume data to verify performance
+- Validate edge cases and error handling
+- Use pytest
+

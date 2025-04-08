@@ -1,0 +1,106 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# Project Structure
+
+```
+.
+├── .cursor
+│   └── rules
+│       ├── git
+│       │   ├── commit_chaos.mdc
+│       │   ├── git_best_practices.mdc
+│       │   └── stage_and_update.mdc
+│       ├── prd.mdc
+│       ├── reports.mdc
+│       ├── structure.mdc
+│       └── tree.mdc
+├── .env.test
+├── .gitignore
+├── .scripts
+│   ├── setup-claude-desktop.js
+│   ├── test-auth.js
+│   └── update_structure.sh
+├── README.md
+├── config.json.example
+├── docs
+│   ├── PRDs
+│   │   ├── PRD_001_more_tools.md
+│   │   ├── PRD_002_test_plan.md
+│   │   ├── PRD_003_architecture.md
+│   │   └── potential_improvements.md
+│   ├── literature
+│   │   ├── Startups Write Changelogs.md
+│   │   ├── The Linear Method.md
+│   │   └── What are MCP Servers and why it changes everything.md
+│   ├── mcp
+│   │   ├── mcp-inspector.md
+│   │   ├── mcp-llms-full.md
+│   │   └── typescript-sdk.md
+│   ├── potential_improvements.md
+│   └── reports
+│       ├── RPT_001_more_tools.md
+│       ├── RPT_002_test_plan.md
+│       └── RPT_003_creating_project_tools.md
+├── example-project-output.json
+├── jest.config.js
+├── package-lock.json
+├── package.json
+├── setup-claude-desktop.js
+├── src
+│   ├── index.ts
+│   ├── lib
+│   │   ├── errors.ts
+│   │   ├── linear-client.ts
+│   │   ├── utils.ts
+│   │   └── validation.ts
+│   ├── tools
+│   │   ├── cycles
+│   │   │   ├── create-cycle.ts
+│   │   │   ├── get-cycles.ts
+│   │   │   ├── index.ts
+│   │   │   └── update-cycle.ts
+│   │   ├── milestones
+│   │   │   ├── create-project-milestone.ts
+│   │   │   ├── get-project-milestones.ts
+│   │   │   ├── index.ts
+│   │   │   └── update-project-milestone.ts
+│   │   ├── projects
+│   │   │   ├── create-project.ts
+│   │   │   ├── get-projects.ts
+│   │   │   ├── index.ts
+│   │   │   └── update-project.ts
+│   │   └── tasks
+│   │       ├── create-task.ts
+│   │       ├── get-tasks.ts
+│   │       ├── get-team-tasks.ts
+│   │       ├── index.ts
+│   │       ├── list-teams.ts
+│   │       └── update-task.ts
+│   └── types
+│       └── index.ts
+├── test-auth.js
+├── tests
+│   ├── integration
+│   │   └── workflows
+│   │       └── project-task-workflow.test.ts
+│   ├── manual
+│   │   └── test_cases.md
+│   ├── setup_linear_test_structure.py
+│   └── unit
+│       ├── conftest.py
+│       ├── test_create_task.py
+│       ├── test_list_teams.py
+│       └── tools
+│           └── tasks
+│               ├── create-task.test.ts
+│               ├── get-tasks.test.ts
+│               ├── get-team-tasks.test.ts
+│               ├── list-teams.test.ts
+│               └── update-task.test.ts
+└── tsconfig.json
+
+25 directories, 70 files
+```

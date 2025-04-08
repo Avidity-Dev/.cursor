@@ -1,0 +1,15 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+would you help me stage and commit my current changes appropriately following [git_best_practices.mdc](mdc:.cursor/rules/git_best_practices.mdc)? 
+
+follow this procedure:
+1) examine the changes with the following commands
+    - `git status` to identify current state
+    - `git diff --name-only | cat` to see which files changed
+    - `git ls-files --others --exclude-standard | cat` to see untracked files
+2) make a suggestion for how to group the commits
+    - identify logical categories that should be committed separately
+3) stage and commit each group in sequence

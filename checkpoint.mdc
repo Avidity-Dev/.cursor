@@ -1,0 +1,20 @@
+---
+description: Whenever user requests a checkpoint.
+globs: 
+alwaysApply: false
+---
+We now need to capture everything recently done.
+
+Make sure to follow these guideliens:
+- [ai_human_collaboration_protocol.mdc](mdc:.cursor/rules/ai_human_collaboration_protocol.mdc)
+- [git_best_practices.mdc](mdc:.cursor/rules/git_best_practices.mdc)
+
+Please do the following:
+1. Look at recent changes with `git status` and/or `git diff | cat`
+2. Collect any additional learnings from recent chats
+3. Create/Update a progress report: Write a detailed description of recent changes in a NEW markdown file under `docs/reports`
+    - Include "RPT_XXX_" as a prefix for the file name. 
+        - The XXX will be the next number relative to the other reports that are there. 
+    - Include everything we've done since the previous commit. 
+    - Don't be shy! You were a huge part of this. Let's track all of our achievements!
+4. git add and commit the changes with a clear commit message

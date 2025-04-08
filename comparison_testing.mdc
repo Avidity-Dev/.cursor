@@ -1,0 +1,78 @@
+---
+description: 
+globs: tests/comparison/*
+alwaysApply: false
+---
+# HCP-HCO Matching Comparison Tests
+
+This rule provides information about the comparison testing framework used to validate the Snowpark implementation against the original Python implementation for HCP-HCO matching.
+
+## Structure
+
+The comparison testing framework is organized in `tests/comparison/` with these key components:
+
+```
+tests/comparison/
+├── cli.py               # Command-line interface
+├── test_comparison.py   # Implementation comparison tests
+├── test_matching.py     # Matching logic tests
+└── utils/               # Utility modules 
+    ├── test_data.py     # Test data access
+    ├── comparison_utils.py  # Comparison functionality
+    └── original_script.py   # Original script wrapper
+```
+
+## Core Concepts
+
+### Test Data
+- All tests use data from existing tables in `INGEST` schema in `EDW_TEST` database in snowflake
+- No mock data is used; only real database tables
+- Key tables include OPENDATA_HCPS, OPENDATA_HCOS, OPENDATA_AFFILS, etc.
+- Test fixtures in `conftest.py` handle access to these tables
+
+### Test Types
+1. **Match Tests** - Verify the correctness of the new Snowpark implementation
+2. **Comparison Tests** - Compare outputs between original and new implementations
+3. **Discovery Tests** - Verify connectivity and table existence
+
+### Comparison Process
+1. Run the original implementation, capturing its outputs
+2. Run the new Snowpark implementation on the same data
+3. Compare results, including:
+   - Row counts
+   - Match type distributions
+   - Data content (optional detailed comparison)
+4. Generate reports documenting the comparison
+
+## Key Utilities
+
+- **test_data.py**: Provides functions to access test data from EDW_TEST.INGEST tables
+- **comparison_utils.py**: Contains functions for comparing implementation outputs
+- **original_script.py**: Wraps the original implementation for controlled execution
+
+## CLI Usage
+
+```bash
+# Run comparison tests
+python -m tests.comparison.cli compare [-p] [-d] [-v]
+
+# Run direct comparison (no pytest)
+python -m tests.comparison.cli direct [-p] [-d]
+
+# Run all tests
+python -m tests.comparison.cli all [-p] [-i] [-v]
+```
+
+Where:
+- `-p` = Use production data instead of test data
+- `-d` = Include detailed data comparison
+- `-i` = Include original script tests
+- `-v` = Verbose output
+
+## Generated Reports
+
+Comparison reports are saved to `tests/comparison/reports/` with timestamp filenames. They contain:
+- Row count comparisons
+- Match type distribution comparisons 
+- Detailed data comparison (if requested)
+- Overall success/failure status 

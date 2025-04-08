@@ -1,0 +1,184 @@
+---
+description: Implement a new adapter to enable the use of snowpark code with DuckDB databases.
+globs: 
+alwaysApply: false
+---
+# Snowpark to DuckDB Adapter: Lessons Learned
+
+## Overview
+This document captures key learnings from implementing a DuckDB adapter layer to run Snowpark-based HCP-HCO matching code against DuckDB for testing purposes.
+
+## Core Principles
+
+1. **Start with Minimal Test Cases**
+   - Test with small, isolated examples before tackling complex queries
+   - Diagnose specific operations that fail rather than debugging entire workflows
+   - Create unit tests for individual adapter components
+
+2. **Implement Comprehensive Logging**
+   - Log SQL expressions before execution for debugging
+   - Track adapter state transitions for complex operations
+   - Ensure data privacy in logs
+
+3. **Dynamic Schema Handling**
+   - Different database systems handle schema details differently (case, types)
+   - Use dynamic inspection of actual schema rather than hard-coded assumptions
+   - Build mappings between different naming conventions automatically
+
+4. **Tiered Approach to Error Recovery**
+   - Implement multiple fallback mechanisms with graceful degradation
+   - Try multiple strategies (exact match → simplified approach → minimal result)
+   - Allow code progression even when optimal solutions fail
+
+5. **Prioritize Practical Functionality**
+   - Focus on supporting operations actually used in the application
+   - Don't attempt complete 1:1 mapping between database APIs
+   - Create simplified alternatives for complex operations
+
+6. **Centralize Common Operations**
+   - Create unified methods for operations like column name resolution
+   - Ensure consistency across the adapter
+   - Reduce code duplication
+
+7. **Intelligent Caching**
+   - Cache results of expensive operations like column resolution
+   - Avoid redundant lookups and transformations
+   - Balance memory usage with performance
+
+8. **Handle System-Specific Differences**
+   - Account for differences in syntax, function names, and behavior
+   - Create abstraction layers to hide implementation details
+   - Maintain interface compatibility with source system
+
+## Core Challenges and Solutions
+
+### 1. Column Case Sensitivity
+- **Problem**: Snowflake typically uses UPPERCASE column names while DuckDB defaults to lowercase
+- **Solution**: Implement dynamic case-insensitive column mapping system
+- **Principle Applied**: Dynamic Schema Handling
+- **Implementation**: The adapter builds mappings between uppercase column names and their actual case representation in DuckDB tables
+
+### 2. SQL Expression Generation
+- **Problem**: Snowpark's `F.col('COL_NAME') == 1` pattern creates invalid SQL for DuckDB
+- **Solution**: Custom `Column` class that generates DuckDB-compatible SQL expressions
+- **Principle Applied**: Handle System-Specific Differences
+- **Implementation**: Custom class translates Snowpark-style expressions to valid DuckDB SQL syntax
+
+### 3. Method Availability Differences
+- **Problem**: Methods like `group_by()` exist in Snowpark but not in DuckDB
+- **Solution**: Adapter methods that translate to appropriate DuckDB operations
+- **Principle Applied**: Handle System-Specific Differences, Prioritize Practical Functionality
+- **Implementation**: Mapped Snowpark DataFrame methods to equivalent DuckDB query operations
+
+### 4. Function Name Differences
+- **Problem**: SQL functions have different names between systems
+- **Solution**: Function name mapping in adapter
+- **Principle Applied**: Handle System-Specific Differences
+- **Implementation**: Added special case handling for common SQL functions (e.g., REGEXP_SUBSTR in Snowflake maps to regexp_extract in DuckDB)
+
+### 5. Inconsistent Column Resolution
+- **Problem**: Inconsistent column name resolution across different operations
+- **Solution**: Unified column resolution method with intelligent caching
+- **Principle Applied**: Centralize Common Operations, Intelligent Caching
+- **Implementation**: The `_resolve_column_name` method handles case sensitivity, Snowflake-style suffixes, and provides consistent fallbacks
+
+### 6. Logical Operator Support
+- **Problem**: Unable to combine filter conditions with logical operators like AND/OR
+- **Solution**: Implemented `__and__` and `__or__` methods in the `Column` class
+- **Principle Applied**: Handle System-Specific Differences
+- **Implementation**: Complex expressions like `(df.col1 == 1) & (df.col2 == 2)` now generate proper SQL
+
+### 7. Aggregation Function Support
+- **Problem**: Snowpark's aggregation functions with aliases were not supported
+- **Solution**: Created an `AggFunction` class that handles method chaining like `max().alias()`
+- **Principle Applied**: Handle System-Specific Differences
+- **Implementation**: Adapter properly generates SQL for group by operations with aggregates and preserves column aliasing
+
+### 8. Complex Processing Failures
+- **Problem**: Complex hierarchy processing in the matching logic fails with DuckDB
+- **Solution**: Simplified alternative processing path for DuckDB testing
+- **Principle Applied**: Tiered Approach to Error Recovery, Prioritize Practical Functionality
+- **Implementation**: Adapter detects DuckDB and provides alternative implementations with placeholder data structures
+
+### 9. Complete Operation Failures
+- **Problem**: Operations failing completely when minor incompatibilities are encountered
+- **Solution**: Multiple fallback mechanisms with graceful degradation
+- **Principle Applied**: Tiered Approach to Error Recovery
+- **Implementation**: Each operation tries multiple strategies to ensure the code can progress even when optimal solutions fail
+
+### 10. Recursion Protection
+- **Problem**: Some adapter patterns can cause infinite recursion
+- **Solution**: State tracking to prevent recursive loops
+- **Principle Applied**: Handle System-Specific Differences
+- **Implementation**: Track method call depth and prevent excessive nesting
+
+### 11. Column Pattern Recognition
+- **Problem**: Snowflake uses patterns like `__V` suffix in column names
+- **Solution**: Pattern recognition and automatic mapping
+- **Principle Applied**: Dynamic Schema Handling
+- **Implementation**: Recognize and handle special column name patterns automatically
+
+## Best Practices
+
+1. **Test with Minimal Examples First**
+   - Validate basic operations before complex queries
+   - Isolate problematic patterns
+   - Create unit tests for specific adapter components
+
+2. **Comprehensive Logging**
+   - Log SQL expressions before execution
+   - Track adapter state transitions
+   - Ensure data privacy in logs
+   - Add contextual information to error messages
+
+3. **Fallback Mechanisms**
+   - Implement graceful fallbacks when exact equivalents don't exist
+   - Add diagnostic information for troubleshooting
+   - Create tiered approaches (exact match → simplified approach → minimal result)
+
+4. **Dynamic Inspection**
+   - Use database metadata to adapt to actual schema
+   - Don't hardcode assumptions about column names
+   - Build mapping dictionaries for cross-system translation
+
+5. **Maintain Interface Consistency**
+   - Keep the outer interface matching Snowpark where possible
+   - Hide internal differences behind the adapter
+   - Preserve method signatures and return types
+
+6. **Incremental Implementation**
+   - Prioritize supporting the subset of operations actually used
+   - Add features as needed based on application requirements
+   - Document limitations and workarounds
+
+7. **Performance Considerations**
+   - Cache expensive operation results
+   - Optimize frequently used code paths
+   - Implement batch operations where appropriate
+
+## Implementation Progress
+
+1. **Centralized Column Resolution System**
+   - Unified column resolution method with intelligent caching
+   - Handles case sensitivity and Snowflake-style suffixes
+   - Provides consistent fallbacks when exact matches aren't found
+
+2. **Logical Operator Support**
+   - Implemented `__and__` and `__or__` methods in the `Column` class
+   - Generates proper SQL with appropriate parentheses and logical operators
+   - Handles complex expressions correctly
+
+3. **Aggregation Function Support**
+   - `AggFunction` class that handles method chaining like `max().alias()`
+   - Properly generates SQL for group by operations with aggregates
+   - Preserves column aliasing
+
+4. **DuckDB-Specific Testing Path**
+   - Simplified alternative processing path for DuckDB testing
+   - Detects DuckDB and provides alternative implementations
+   - Enables testing of downstream functionality
+
+5. **Tiered Error Recovery**
+   - Multiple fallback mechanisms with graceful degradation
+   - Each operation tries multiple strategies
+   - Ensures code progression even when optimal solutions fail

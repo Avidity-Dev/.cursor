@@ -1,0 +1,360 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# HCP-HCO Matching System Repository Structure
+
+This document outlines the structure of the Healthcare Provider to Healthcare Organization (HCP-HCO) matching system implemented with Snowpark Python and DuckDB adapters.
+
+## Root Directory
+
+```
+.
+├── Makefile                                    # Build automation and commands
+├── README.md                                   # Project overview and main documentation
+├── mypy.ini                                    # MyPy type checking configuration
+├── rename_reports.py                           # Utility for renaming reports
+├── requirements.txt                            # Python dependencies
+├── setup.py                                    # Package setup configuration
+```
+
+## Data Files
+
+```
+├── data/                                       # Data storage directory
+│   ├── addresses_data.duckdb                   # DuckDB database for addresses
+│   ├── affiliations_data.duckdb                # DuckDB database for affiliations
+│   ├── hco_data.duckdb                         # DuckDB database for HCO data
+│   ├── hcp_data.duckdb                         # DuckDB database for HCP data
+│   ├── hierarchy_data.duckdb                   # DuckDB database for hierarchy data
+│   └── snowflake_data.duckdb                   # DuckDB database for Snowflake data
+```
+
+## Documentation
+
+```
+├── docs/                                       # Documentation root
+│   ├── Learnings/                              # Technical learnings
+│   │   ├── key-auth.md                         # Authentication documentation
+│   │   ├── local-imports.md                    # Local imports guide
+│   │   └── pytest-cov.md                       # Pytest coverage documentation
+│   ├── PRD/                                    # Product Requirements Documents
+│   │   ├── 01-deployment/                      # Deployment documentation
+│   │   │   ├── 01f-dev-setup.md                # Developer setup guide
+│   │   │   ├── 01g-code-adaptation.md          # Code adaptation guidelines
+│   │   │   └── 01h-deployment-steps.md         # Deployment procedure
+│   │   ├── 01-implementation/                  # Implementation details
+│   │   │   ├── 01a-current-state.md            # Current system documentation
+│   │   │   ├── 01b-target-state.md             # Target state with Snowpark
+│   │   │   ├── 01c-business-rules.md           # Business rules
+│   │   │   ├── 01d-performance-reqs.md         # Performance requirements
+│   │   │   ├── 01e-security-reqs.md            # Security requirements
+│   │   │   └── 01i-snowpark-implementation.md  # Snowpark specifics
+│   │   ├── future-integrations/                # Future integration plans
+│   │   │   ├── api-integration.md              # API integration
+│   │   │   ├── dagster-integration.md          # Dagster integration
+│   │   │   ├── dbt-integration.md              # dbt integration
+│   │   │   └── dlt-integration.md              # DLT integration
+│   │   ├── 00-project-overview.md              # Project overview
+│   │   ├── 02-database-schema.md               # Database schema definitions
+│   │   ├── 03-algorithm-logic.md               # Algorithm documentation
+│   │   ├── 03a-algorithm-overview.md           # Algorithm overview
+│   │   ├── 03b-matching-priority-implementation.md  # Matching priorities
+│   │   ├── 03c-tiebreaking-and-edge-cases.md   # Tie-breaking rules
+│   │   ├── 04-testing-validation.md            # Testing approach
+│   │   ├── 04a-testing-overview.md             # Testing overview
+│   │   ├── 04b-unit-tests.md                   # Unit testing
+│   │   ├── 04c-integration-tests.md            # Integration testing
+│   │   ├── 04d-data-quality-tests.md           # Data quality tests
+│   │   ├── 05-monitoring-operations.md         # Operations procedures
+│   │   ├── 06-project-timeline.md              # Project timeline
+│   │   ├── 07-future-integration.md            # Future roadmap
+│   │   ├── PRD_008_depinj_integration.md       # Dependency injection integration
+│   │   ├── PRD_009_matching_improvements.md    # Matching improvements
+│   │   ├── PRD_010_mapbox.md                   # Mapbox integration
+│   │   ├── PRJ_006_plan.md                     # Project 6 plan
+│   │   ├── PRJ_007_plan.md                     # Project 7 plan
+│   │   └── documentation_map.md                # Documentation directory
+│   ├── Progress Reports/                        # Progress reports
+│   │   ├── RPT_001_PROGRESS.md                 # Initial progress
+│   │   ├── RPT_002_phase1_review.md            # Phase 1 review
+│   │   ├── RPT_003_phase1_summary.md           # Phase 1 summary
+│   │   ├── RPT_004_snowpark_best_practices.md  # Snowpark best practices
+│   │   ├── RPT_005_PR_DESCRIPTION.md           # PR description template
+│   │   ├── RPT_006_connection_testing.md       # Connection testing
+│   │   ├── RPT_007_pr_description_connection_tests.md # Connection test PR
+│   │   ├── RPT_008_pr_description_connection_refactoring.md # Connection refactoring PR
+│   │   ├── RPT_009_testing.md                  # Testing documentation
+│   │   ├── RPT_010_snowflake_test_refactoring.md # Snowflake test refactoring
+│   │   ├── RPT_011_pr_duckdb_setup.md          # DuckDB setup PR
+│   │   ├── RPT_012_duckdb_progress.md          # DuckDB progress
+│   │   ├── RPT_013_DDD_refactor_plan.md        # DDD refactoring plan
+│   │   ├── RPT_014_sso_auth_testing.md         # SSO auth testing
+│   │   ├── RPT_015_snowflake_sso_authentication.md # Snowflake SSO auth
+│   │   ├── RPT_016_snowflake_schema_exploration.md # Snowflake schema exploration
+│   │   ├── RPT_017_config_env_consolidation.md # Config environment consolidation
+│   │   ├── RPT_018_validation_script_refactoring.md # Validation script refactoring
+│   │   ├── RPT_019_snowflake_connector_improvements.md # Snowflake connector improvements
+│   │   ├── RPT_020_matching_service_improvements.md # Matching service improvements
+│   │   ├── RPT_021_dependency_injection_enhancements.md # DI enhancements
+│   │   ├── RPT_022_primary_affiliation_testing.md # Primary affiliation testing
+│   │   ├── RPT_023_dependency_injection_testing.md # DI testing
+│   │   ├── RPT_024_error_handling_implementation.md # Error handling implementation
+│   │   ├── RPT_025_depinj_integration.md       # Dependency injection integration
+│   │   ├── RPT_026_validation_matching_fixes.md # Validation matching fixes
+│   │   └── RPT_027_validation_framework_improvements.md # Validation framework improvements
+│   ├── archive/                                # Historical documentation
+│   │   ├── data_flow.mmd                       # Data flow diagrams
+│   │   ├── functions.md                        # Function specifications
+│   │   ├── hco_tables.md                       # HCO table documentation
+│   │   ├── notes.md                            # General notes
+│   │   ├── prd-notes.md                        # PRD notes
+│   │   ├── prd.md                              # Original PRD
+│   │   └── roadmap.md                          # Original roadmap
+│   ├── refactoring/                            # Refactoring documentation
+│   │   └── ddd_alignment_plan.md               # Domain-Driven Design alignment plan
+│   ├── architecture.mmd                        # Architecture diagram
+│   ├── error_handling_guidelines.md            # Error handling guidelines
+│   └── type_hints_best_practices.md            # Type hints best practices
+```
+
+## Source Code
+
+```
+├── src/                                        # Source code root
+│   ├── application/                            # Application layer
+│   │   ├── services/                           # Application services
+│   │   │   ├── __init__.py                     # Package initialization
+│   │   │   └── matching_service.py             # Matching service implementation
+│   │   ├── README.md                           # Module documentation
+│   │   ├── __init__.py                         # Package initialization
+│   │   ├── composition_root.py                 # Dependency composition root
+│   │   ├── main.py                             # Main application entry point
+│   │   └── service_factory.py                  # Service factory
+│   ├── domain/                                 # Domain layer
+│   │   ├── config/                             # Domain configuration
+│   │   │   ├── MIGRATION_GUIDE.md              # Configuration migration guide
+│   │   │   ├── __init__.py                     # Package initialization
+│   │   │   ├── config.yaml                     # Configuration defaults
+│   │   │   └── config_loader.py                # Configuration loading
+│   │   ├── entities/                           # Domain entities
+│   │   │   ├── __init__.py                     # Package initialization
+│   │   │   ├── hco.py                          # HCO entity
+│   │   │   └── hcp.py                          # HCP entity
+│   │   ├── repositories/                       # Repository interfaces
+│   │   │   ├── __init__.py                     # Package initialization
+│   │   │   ├── affiliation_repository_interface.py  # Affiliation repository interface
+│   │   │   ├── hco_repository_interface.py     # HCO repository interface
+│   │   │   ├── hcp_repository_interface.py     # HCP repository interface
+│   │   │   └── repository_interface.py         # Base repository interface
+│   │   ├── services/                           # Domain services
+│   │   │   ├── __init__.py                     # Package initialization
+│   │   │   ├── haversine.py                    # Haversine distance calculation
+│   │   │   ├── matching.py                     # Matching logic
+│   │   │   ├── matching_service_interface.py   # Matching service interface
+│   │   │   ├── validation_framework.py         # Validation framework
+│   │   │   ├── validation_report.py            # Validation reporting
+│   │   │   └── validation_service.py           # Validation service
+│   │   ├── value_objects/                      # Value objects
+│   │   │   ├── __init__.py                     # Package initialization
+│   │   │   ├── address.py                      # Address value object
+│   │   │   └── match_result.py                 # Match result value object
+│   │   ├── README.md                           # Module documentation
+│   │   ├── __init__.py                         # Package initialization
+│   │   ├── error_handler.py                    # Error handling
+│   │   ├── exceptions.py                       # Domain exceptions
+│   │   └── monitoring.py                       # Domain monitoring
+│   ├── examples/                               # Example code
+│   │   ├── error_handling_demo.py              # Error handling demonstration
+│   │   └── snowflake_sso_example.py            # Snowflake SSO example
+│   ├── infrastructure/                         # Infrastructure layer
+│   │   ├── adapters/                           # Adapters
+│   │   │   ├── __init__.py                     # Package initialization
+│   │   │   ├── database.py                     # Database adapter
+│   │   │   └── db_adapter.py                   # Database adapter interface
+│   │   ├── config/                             # Configuration
+│   │   │   ├── __init__.py                     # Package initialization
+│   │   │   └── tables.py                       # Table definitions
+│   │   ├── monitoring/                         # Monitoring
+│   │   │   ├── __init__.py                     # Package initialization
+│   │   │   ├── debug_utils.py                  # Debugging utilities
+│   │   │   └── monitoring.py                   # Monitoring implementation
+│   │   ├── persistence/                        # Data persistence
+│   │   │   ├── repositories/                   # Repository implementations
+│   │   │   ├── README.md                       # Module documentation
+│   │   │   ├── __init__.py                     # Package initialization
+│   │   │   ├── config.py                       # Persistence configuration
+│   │   │   ├── connection.py                   # Database connection
+│   │   │   ├── crypto.py                       # Cryptography utilities
+│   │   │   ├── errors.py                       # Error handling
+│   │   │   ├── main.py                         # Main entry point
+│   │   │   ├── repository_factory.py           # Repository factory
+│   │   │   ├── sso_auth.py                     # SSO authentication
+│   │   │   └── utils.py                        # Utilities
+│   │   ├── security/                           # Security
+│   │   │   ├── __init__.py                     # Package initialization
+│   │   │   └── vault.py                        # Secure storage
+│   │   ├── utils/                              # Infrastructure utilities
+│   │   │   ├── __init__.py                     # Package initialization
+│   │   │   └── retry.py                        # Retry functionality
+│   │   ├── README.md                           # Module documentation
+│   │   └── __init__.py                         # Package initialization
+│   ├── __init__.py                             # Package initialization
+│   └── run_matching.py                         # Main script entry point
+```
+
+## Tests
+
+```
+├── tests/                                      # Testing framework
+│   ├── application/                            # Application layer tests
+│   │   ├── services/                           # Application services tests
+│   │   │   ├── __init__.py                     # Package initialization
+│   │   │   ├── test_data_validation.py         # Data validation tests
+│   │   │   └── test_matching_service_error_handling.py  # Error handling tests
+│   │   ├── __init__.py                         # Package initialization
+│   │   ├── test_composition_root.py            # Composition root tests
+│   │   ├── test_entry_points.py                # Entry points tests
+│   │   └── test_service_factory.py             # Service factory tests
+│   ├── comparison/                             # Implementation comparison tests
+│   │   ├── reports/                            # Test reports
+│   │   │   └── __init__.py                     # Package initialization
+│   │   ├── utils/                              # Test utilities
+│   │   │   ├── __init__.py                     # Package initialization
+│   │   │   ├── comparison_utils.py             # Comparison utilities
+│   │   │   ├── original_script.py              # Original script for comparison
+│   │   │   └── test_data.py                    # Test data
+│   │   ├── README.md                           # Documentation
+│   │   ├── __init__.py                         # Package initialization
+│   │   ├── cli.py                              # Command-line interface
+│   │   ├── conftest.py                         # Pytest configuration
+│   │   ├── test_comparison.py                  # Comparison tests
+│   │   └── test_matching.py                    # Matching logic tests
+│   ├── data/                                   # Test data
+│   │   ├── __init__.py                         # Package initialization
+│   │   └── test.db                             # Test database
+│   ├── domain/                                 # Domain layer tests
+│   │   ├── config/                             # Configuration tests
+│   │   │   └── test_config.py                  # Configuration tests
+│   │   ├── entities/                           # Entity tests
+│   │   │   └── __init__.py                     # Package initialization
+│   │   ├── services/                           # Domain services tests
+│   │   │   ├── __init__.py                     # Package initialization
+│   │   │   ├── conftest.py                     # Test fixtures
+│   │   │   ├── test_address_comparison_validation.py  # Address comparison validation tests
+│   │   │   ├── test_duckdb_matching.py         # DuckDB matching tests
+│   │   │   ├── test_haversine.py               # Haversine calculation tests
+│   │   │   ├── test_helpers.py                 # Helper function tests
+│   │   │   ├── test_matching_address_comparison.py  # Address comparison tests
+│   │   │   ├── test_matching_assignment_logic.py  # Assignment logic tests
+│   │   │   ├── test_matching_integration.py    # Matching integration tests
+│   │   │   ├── test_matching_primary_assignment.py  # Primary assignment tests
+│   │   │   ├── test_matching_primary_assignment_di.py  # Primary assignment DI tests
+│   │   │   ├── test_validation_framework.py    # Validation framework tests
+│   │   │   ├── test_validation_integration.py  # Validation integration tests
+│   │   │   └── test_validation_report.py       # Validation report tests
+│   │   ├── value_objects/                      # Value objects tests
+│   │   │   └── __init__.py                     # Package initialization
+│   │   ├── __init__.py                         # Package initialization
+│   │   ├── test_error_handler.py               # Error handler tests
+│   │   ├── test_error_handler_monitoring.py    # Error handler monitoring tests
+│   │   └── test_monitoring.py                  # Monitoring tests
+│   ├── infrastructure/                         # Infrastructure layer tests
+│   │   ├── adapters/                           # Adapters tests
+│   │   │   ├── __init__.py                     # Package initialization
+│   │   │   ├── test_database.py                # Database tests
+│   │   │   ├── test_database_adapter.py        # Database adapter tests
+│   │   │   └── test_db_adapter.py              # DB adapter tests
+│   │   ├── config/                             # Configuration tests
+│   │   │   └── __init__.py                     # Package initialization
+│   │   ├── monitoring/                         # Monitoring tests
+│   │   │   ├── __init__.py                     # Package initialization
+│   │   │   └── test_debug.py                   # Debug utils tests
+│   │   ├── persistence/                        # Persistence tests
+│   │   │   ├── repositories/                   # Repositories tests
+│   │   │   ├── snowflake/                      # Snowflake tests
+│   │   │   ├── __init__.py                     # Package initialization
+│   │   │   ├── conftest.py                     # Test fixtures
+│   │   │   ├── test_repository_exception_handling.py  # Exception handling tests
+│   │   │   └── test_repository_factory.py      # Repository factory tests
+│   │   ├── security/                           # Security tests
+│   │   │   └── __init__.py                     # Package initialization
+│   │   ├── utils/                              # Utilities tests
+│   │   │   └── test_enhanced_retry.py          # Retry functionality tests
+│   │   └── __init__.py                         # Package initialization
+│   ├── mocks/                                  # Mock objects
+│   │   └── mock_repositories.py                # Mock repositories
+│   ├── __init__.py                             # Package initialization
+│   ├── error_handling_test.py                  # Error handling tests
+│   └── test_duckdb_setup.py                    # DuckDB setup tests
+```
+
+## Scripts and Tools
+
+```
+├── scripts/                                    # Utility scripts
+│   ├── PRJ_001_ppmd_assignments/               # PPMD assignments project
+│   │   ├── PPMD_Certified_Duchenne_Care_Centers.csv  # PPMD care centers data
+│   │   ├── duchenne_care_centers_with_coordinates.csv  # Care centers with coordinates
+│   │   └── notebook.ipynb                      # Analysis notebook
+│   ├── bash/                                   # Bash scripts
+│   │   ├── ddd_migration.sh                    # DDD migration script
+│   │   └── setup_dev.sh                        # Development setup script
+│   ├── enhance_sf_connector/                   # Snowflake connector enhancement
+│   │   ├── future_auth_class_implementation.md  # Auth class implementation plan
+│   │   └── plan.md                             # Enhancement plan
+│   ├── validate_prod_code_vs_original/         # Production code validation
+│   │   ├── README.md                           # Documentation
+│   │   ├── compare_results.py                  # Results comparison script
+│   │   ├── new_data_flow.mmd                   # New data flow diagram
+│   │   ├── original_data_flow.mmd              # Original data flow diagram
+│   │   ├── primary_affil_calc.py               # Primary affiliation calculation
+│   │   ├── prompt.md                           # Prompt documentation
+│   │   ├── run_hcp_hco_matching.py             # HCP-HCO matching runner
+│   │   ├── run_original_matching.py            # Original matching runner
+│   │   ├── run_validation.py                   # Validation runner
+│   │   └── validation_utils.py                 # Validation utilities
+│   ├── duckdb_setup.py                         # DuckDB setup script
+│   ├── explore_edw_test.py                     # EDW test explorer
+│   ├── get_column_info.py                      # Column information script
+│   └── pull_table.py                           # Table extraction script
+```
+
+## Logs and Build Artifacts
+
+```
+├── logs/                                       # Log files
+│   ├── affiliation_matching.log                # Affiliation matching logs
+│   ├── full_validation_*.log                   # Full validation logs
+│   ├── matching_comparison_*.log               # Matching comparison logs
+│   └── original_matching_*.log                 # Original matching logs
+├── htmlcov/                                    # HTML coverage reports
+│   ├── class_index.html                        # Class index
+│   ├── function_index.html                     # Function index
+│   ├── index.html                              # Main index
+│   ├── status.json                             # Coverage status
+│   └── various coverage files                  # Coverage for specific files
+├── mastermind.egg-info/                        # Package metadata
+│   ├── PKG-INFO                                # Package information
+│   ├── SOURCES.txt                             # Source files
+│   ├── dependency_links.txt                    # Dependency links
+│   ├── requires.txt                            # Requirements
+│   └── top_level.txt                           # Top-level packages
+```
+
+## Project Summary
+
+This repository contains a Healthcare Provider to Healthcare Organization (HCP-HCO) matching system implemented using a Domain-Driven Design approach with adapters for both Snowpark Python and DuckDB. The core functionality revolves around matching healthcare providers to organizations based on geographic location, network affiliations, and other criteria.
+
+Key components:
+- Domain-Driven Design architecture with clear separation of concerns
+- Multiple database adapters (Snowflake and DuckDB)
+- Dependency Injection framework for better testability
+- Geographic distance calculations (Haversine)
+- Comprehensive validation framework
+- Advanced error handling
+- Extensive automated testing
+- Detailed documentation
+
+The project follows a structured approach with clearly defined phases, business rules, and technical requirements, making it suitable for production use in healthcare data processing.
