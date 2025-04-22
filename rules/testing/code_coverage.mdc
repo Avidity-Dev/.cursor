@@ -1,0 +1,62 @@
+---
+description: 
+globs: tests/**/test_*.py
+alwaysApply: false
+---
+# Rule: Verifying Code Coverage with pytest-cov
+
+This rule outlines the standard procedure for measuring and verifying unit test coverage in Python projects using `pytest-cov`.
+
+## Purpose
+
+To ensure that unit tests adequately exercise the application's source code and meet defined coverage targets (e.g., >80% as specified in project requirements or PRDs).
+
+## Tooling
+
+*   **Library:** `coverage.py`
+*   **Plugin:** `pytest-cov` (integrates `coverage.py` with `pytest`)
+
+## Procedure
+
+1.  **Installation:**
+    *   Ensure `pytest-cov` is installed in your testing environment:
+        ```bash
+        pip install pytest-cov
+        ```
+    *   Alternatively, add `pytest-cov` to your project's dependency management file (e.g., `requirements-dev.txt`, `pyproject.toml`).
+
+2.  **Running Tests with Coverage:**
+    *   Execute `pytest` with the `--cov` flag, specifying the path(s) to your source code directory/module(s) you want to measure:
+        ```bash
+        # Measure coverage for the entire 'src' directory
+        pytest --cov=src tests/
+
+        # Measure coverage for a specific package
+        pytest --cov=src/domain/services tests/unit/domain/services/
+        ```
+    *   The `--cov=<path>` argument is crucial. It tells `coverage.py` which code should be considered for the coverage calculation.
+
+3.  **Interpreting Terminal Report:**
+    *   By default, `pytest-cov` outputs a summary report to the terminal after the tests complete.
+    *   This report shows the percentage of executable statements covered for each file and the total coverage percentage.
+    *   You can add `-r a` to show line numbers that were *not* covered (`pytest --cov=src -r a tests/`).
+
+4.  **Generating HTML Report (Recommended):**
+    *   For a detailed, line-by-line view of coverage, generate an HTML report:
+        ```bash
+        pytest --cov=src --cov-report=html tests/
+        ```
+    *   This creates a `htmlcov/` directory in your project root.
+    *   Open the `htmlcov/index.html` file in a web browser.
+    *   The report highlights covered lines (green), missed lines (red), and excluded lines (gray), making it easy to identify gaps in testing.
+
+5.  **Verification:**
+    *   Compare the **Total** coverage percentage shown in the report against the project's requirements.
+    *   Use the HTML report to investigate specific files or lines that are not covered and determine if additional tests are needed.
+
+6.  **CI/CD Integration (Optional but Recommended):**
+    *   Integrate the coverage check into your Continuous Integration pipeline.
+    *   Configure the pipeline to fail if coverage drops below the required threshold using flags like `--cov-fail-under=80`.
+        ```bash
+        pytest --cov=src --cov-fail-under=80 tests/
+        ``` 

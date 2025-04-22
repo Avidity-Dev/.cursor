@@ -1,0 +1,51 @@
+---
+description: Guidelines for performance optimization and deployment procedures
+globs: ["**/*.py", "**/docker-compose.yaml", "**/Dockerfile"]
+---
+
+# PERFORMANCE CONSIDERATIONS
+
+- Implement pagination for large data sets
+- Use batch processing for bulk operations
+- Profile and optimize slow operations
+- Implement caching where appropriate
+- Use async operations for I/O-bound tasks
+- Monitor and log performance metrics
+
+## Database Optimization
+- Use efficient queries and indexes
+- Implement connection pooling
+- Use batch operations for bulk updates
+- Monitor query performance
+- Implement proper database scaling
+
+## API Performance
+- Implement proper rate limiting
+- Use compression for large responses
+- Implement caching for frequently accessed data
+- Use pagination for large result sets
+- Monitor API response times
+
+# DEPLOYMENT PROCEDURES
+
+- Document deployment steps and requirements
+- Implement CI/CD pipeline with Azure DevOps
+- Include database migration procedures
+- Document rollback procedures
+- Implement health checks and monitoring
+- Use semantic versioning for releases
+
+## Docker Deployment
+- Use multi-stage builds for smaller images
+- Implement proper health checks
+- Use environment variables for configuration
+- Document resource requirements
+- Implement proper logging configuration
+
+# TROUBLESHOOTING GUIDELINES
+
+- Document common error scenarios and solutions
+- Implement detailed error logging
+- Create diagnostic tools and scripts
+- Document debugging procedures
+- Maintain a knowledge base of past issues and resolutions 

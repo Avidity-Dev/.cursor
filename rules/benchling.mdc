@@ -1,0 +1,28 @@
+---
+description: Guidelines for Benchling API integration and entity management
+globs: ["**/benchling/**/*.py", "**/services/benchling*.py"]
+alwaysApply: false
+---
+
+# BENCHLING INTEGRATION SPECIFICS
+
+## API Usage
+- Always use the benchling-sdk package for API interactions
+    - The sdk docs are indexed should be included with relevant queries by including `@Benchling Python SDK` in the query
+- Store API credentials securely using environment variables
+- Implement proper rate limiting and error handling for API calls
+- Cache frequently accessed Benchling data when appropriate
+- Use entity IDs from the appropriate environment (dev/prod)
+
+## Entity Management
+- Follow Benchling's entity relationship model
+- Maintain consistent naming conventions across entities
+- Document schema IDs and folder IDs in resources/api_ids directory
+- Implement validation for required fields before entity creation
+
+## Benchling Data Models
+- Create proper data models for Benchling entities
+- Use type hints for all entity properties
+- Implement serialization/deserialization methods
+- Validate data before sending to Benchling API
+- Handle API version changes gracefully 

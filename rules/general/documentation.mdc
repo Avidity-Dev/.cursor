@@ -1,0 +1,42 @@
+---
+description: Guidelines for code and project documentation
+globs: ["**/*.py", "**/*.md", "**/*.rst"]
+---
+
+# DOCUMENTATION
+
+- Maintain clear README with setup instructions
+- Document API interactions, data flows, and complex logic
+- Provide docstrings (NumPy style) for Python code
+- Use minimal inline comments except for complex logic
+- Document permission requirements
+
+## Code Documentation
+- Use NumPy style docstrings for all functions and classes
+- Document parameters, return values, and exceptions
+- Include examples for complex functions
+- Document assumptions and limitations
+- Keep docstrings up-to-date with code changes
+
+## Project Documentation
+- Maintain a comprehensive README
+- Document setup and installation procedures
+- Include usage examples
+- Document configuration options
+- Keep documentation in sync with code
+
+## API Documentation
+- Document all API endpoints
+- Include request and response formats
+- Document authentication requirements
+- Include example requests and responses
+- Document error responses and codes
+
+## Quarto Documentation
+Quarto (.qmd) code cells appear as:
+```{r}
+# code here
+```
+- Labels sometimes appear as: `#| label:`
+- Comments may describe logic between code cells
+- Sometimes code outputs (tables, lists) appear beneath code chunks 

@@ -23,7 +23,7 @@ Each file name should start `PRD_XXX_` where XXX is an arbitraty number starting
 - Be as clear as possible and style this to be read by a Large Language Model (LLM)
 - Include a motivation section at the beginning, followed by a more detailed overview
 - If you use icons, include an icon legend
-- Divide the project into phases and include a tracking table that includes the headings phase, task, status, comments
+- Divide the project into milestones, each with very specific and focused tasks.
 
 ## 2. Project Process
 

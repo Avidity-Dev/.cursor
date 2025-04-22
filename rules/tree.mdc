@@ -8,5 +8,5 @@ alwaysApply: true
 If you create a new file(s), please run the following command to update the project documentation:
 
 ```bash
-tree -I "node_modules|.git|dist|build" -a > repository_structure.mdc
+tree -I "node_modules|.git|dist|build|__pycache__|*.pyc|logs|.pytest_cache|venv|.venv|.cursor|.dev|transforms/dbt_packages" -a > docs/repository_structure.md
 ```

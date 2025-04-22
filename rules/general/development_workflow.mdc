@@ -1,0 +1,42 @@
+---
+description: Guidelines for development workflow and engineering principles
+globs: ["**/*"]
+---
+
+# DEVELOPMENT WORKFLOW
+
+- Use proper Git with semantic versioning for releases
+- Implement robust code review processes
+- Maintain a clear changelog
+- Follow branch naming conventions
+- Use feature branches for development
+
+## Git Workflow
+- Use feature branches for new features
+- Use bugfix branches for bug fixes
+- Create pull requests for code review
+- Squash commits before merging
+- Write descriptive commit messages
+
+## Code Review
+- Review code for correctness, style, and performance
+- Use automated code quality tools
+- Document review decisions
+- Address all review comments
+- Verify tests pass before merging
+
+# ENGINEERING PRINCIPLES
+
+- SOLID principles
+- Clean Architecture
+- Layered architecture (presentation, business logic, data access)
+- Dependency injection for loose coupling
+- API-first design for scalability
+- Event-driven architecture when appropriate
+
+## Design Patterns
+- Use appropriate design patterns for common problems
+- Document pattern usage and rationale
+- Avoid over-engineering
+- Prefer composition over inheritance
+- Use interfaces for abstraction 

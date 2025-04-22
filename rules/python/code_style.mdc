@@ -1,0 +1,29 @@
+---
+description: Guidelines for code style, structure, and quality
+globs: ["**/*.py", "**/*.ipynb"]
+---
+
+# CODE STYLE AND STRUCTURE
+
+- Write concise, technical Python code in OOP style
+- Prefer iteration & modularization over duplication
+- Use descriptive variable names (e.g., isLoading)
+- Follow repository structure as defined in project documentation
+
+# CODE QUALITY
+
+- Follow PEP 8 for Python
+- Use linters and formatters (pylint, black)
+- Regular code reviews and pair programming
+- Secure authentication, encryption, and vulnerability protection
+- Optimize performance with efficient algorithms, caching, and query optimization
+
+# CODE SNIPPET & FILE CREATION RULES
+
+- ALWAYS add typing annotations to functions and classes
+- Include return types as needed
+- Update existing docstrings if needed
+- Preserve existing comments
+- Use absolute imports where possible
+- Use only pytest for tests
+- Place tests in ./tests with typed test functions and docstrings 

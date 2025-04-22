@@ -3,7 +3,9 @@ description: Progress Reports (RPT).
 globs: 
 alwaysApply: false
 ---
-Progress reports are the central documents for tracking all aspects of project progress. These files MUST be maintained throughout the project lifecycle. They are stored in `docs/reports`. BEFORE adding any dates, use terminal `date` command to get the current date.
+Progress reports are the central documents for tracking all aspects of project progress. These files MUST be maintained throughout the project lifecycle. They are stored in `docs/reports`. 
+
+CRITICAL: BEFORE adding any dates, use terminal `date` command to get the current date.
 
 ### 1.1. CRITICAL: Information Preservation
 - **NEVER delete historical information** - this is the most important rule
@@ -13,22 +15,8 @@ Progress reports are the central documents for tracking all aspects of project p
 - When updating task status, modify the existing entries instead of removing them
 - Maintain the complete chronological history of all project phases
 
-Example of correct update:
-```markdown
-| Task A | In Progress | March 17, 2024 | - | Working on implementation |
-```
-Changed to:
-```markdown
-| Task A | Completed | March 17, 2024 | March 18, 2024 | Implemented and tested |
-```
-
-Example of INCORRECT update (never do this):
-```markdown
-// Deleting or replacing an entire section with new content
-```
-
 ### 1.2. Organization Structure
-- Use consistent phase naming across projects
+- Use consistent milestone naming across projects
 - When adding new entries, place them in appropriate sections
 - Use consistent formatting for all progress entries
 - Include specific dates and clear task descriptions

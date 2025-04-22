@@ -1,5 +1,5 @@
 ---
-description: Implement a new adapter to enable the use of snowpark code with DuckDB databases.
+description: 
 globs: 
 alwaysApply: false
 ---

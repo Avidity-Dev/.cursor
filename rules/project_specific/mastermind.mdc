@@ -1,5 +1,5 @@
 ---
-description: Review high level project information.
+description: Mastermind project description
 globs: 
 alwaysApply: false
 ---
@@ -8,7 +8,29 @@ alwaysApply: false
 ## Project Overview
 This project focuses on converting an existing Python-based HCP-HCO matching algorithm into a production-ready Snowflake implementation using Snowpark. The system matches healthcare providers (HCPs) to healthcare organizations (HCOs) based on address data and affiliation information.
 
+## Project Structure
+
+- `src/`: Contains the main source code for the application.
+  - `@mastermind`: Core game logic and classes.
+- `tests/`: Contains unit and integration tests. See @pytest.ini for configuration.
+- `scripts/`: Utility scripts for development, deployment, or data processing.
+- `notebooks/`: Jupyter notebooks for experimentation and analysis.
+- `docs/`: Project documentation.
+  - `@repository_structure`: Auto-generated file tree.
+- `data/`: Data files used by the application (e.g., word lists, game history).
+- `logs/`: Log files generated during application execution.
+- `.dev/journal/` (SYM LINK): Learnings and guidelines extracted from development progress.
+- `.cursor/` (SYM LINK): Configuration and rules for the Cursor AI assistant.
+  - `@rules/`: Directory containing Cursor Rules.
+- `requirements.txt`: Project dependencies. @requirements.txt
+- `setup.py`: Build script for the package. @setup.py
+- `Makefile`: Common development commands. @Makefile
+- `README.md`: Project overview and setup instructions. @README.md
+
+See `@docs/repository_structure.md` for a more detailed project structure.
+
 ## Project Objectives
+
 1. Implement the existing Python algorithm using Snowpark's Python API
 2. Enhance address geocoding using Mapbox integration
 3. Implement robust error handling and validation
@@ -16,6 +38,7 @@ This project focuses on converting an existing Python-based HCP-HCO matching alg
 5. Produce high-quality, maintainable code with documentation
 
 ## Domain-Specific Requirements
+
 1. **Data Processing**
    - Maintain exact matching logic from original algorithm
    - Support the same hierarchy of match types
@@ -36,6 +59,7 @@ This project focuses on converting an existing Python-based HCP-HCO matching alg
    - HCO hierarchy resolution table
 
 ## Success Criteria
+
 1. Results match the original Python implementation
 2. Performance meets or exceeds original implementation
 3. Error handling covers all edge cases
@@ -52,12 +76,14 @@ This project focuses on converting an existing Python-based HCP-HCO matching alg
 - Apply proper schema design and naming conventions
 
 ### Performance Considerations
+
 - Optimize DataFrame operations to leverage Snowflake's query optimizer
 - Minimize data movement between Snowpark and Snowflake
 - Use appropriate caching strategies
 - Implement efficient UDFs for custom logic
 
 ### Testing Strategy
+
 - Validate against known test cases
 - Compare outputs to original Python implementation
 - Test with volume data to verify performance

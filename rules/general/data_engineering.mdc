@@ -1,0 +1,340 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+
+# DATA ENGINEERING BEST PRACTICES
+
+- Proper data modeling (star/snowflake schema)
+- Data normalization/denormalization strategies
+- Efficient indexing & partitioning for large datasets
+- Data cleansing and validation processes
+- Incremental loading and change data capture techniques
+- Data lineage & metadata management
+
+## Data Processing
+- Use pandas for data transformation
+- Implement proper error handling for data processing
+- Document data transformations and business rules
+- Implement data validation and quality checks
+- Use efficient algorithms for large data processing
+
+## Data Storage
+- Use appropriate storage formats (CSV, Parquet, etc.)
+- Implement proper data partitioning
+- Document data schemas and formats
+- Implement data versioning
+- Use compression for large datasets
+
+## ETL Processes
+- Document ETL workflows
+- Implement proper logging and monitoring
+- Use incremental processing when possible
+- Implement error handling and recovery
+- Document data dependencies
+
+## Dagster
+
+### Core Concepts
+
+Dagster orchestrates end-to-end data pipelines, connecting extraction, loading, and transformation.
+
+### Best Practices
+
+1. **Asset-Based Architecture**
+
+Modern Dagster code should leverage the asset-based paradigm:
+
+```python
+@asset
+def raw_customers():
+    return dlt.run(pipeline_name, ["customers"])
+
+@asset(deps=[raw_customers])
+def transformed_customers():
+    return subprocess.run(["dbt", "run", "--select", "marts.dim_customers"])
+```
+
+2. **Partitioning and Backfilling**
+
+Design with partitioning in mind:
+
+```python
+@asset(
+    partitions_def=DailyPartitionsDefinition(start_date="2023-01-01"),
+)
+def daily_metrics(context):
+    partition_date = context.asset_partition_key_for_output()
+    return process_data_for_date(partition_date)
+```
+
+3. **Resources and Configuration**
+
+Parameterize your pipelines:
+
+```python
+@asset(
+    required_resource_keys={"warehouse"},
+)
+def processed_data(context):
+    return context.resources.warehouse.execute_query("SELECT * FROM raw_data")
+
+# Define resources
+warehouse_prod = ResourceDefinition.hardcoded_resource(
+    WarehouseConnection(host="prod-db")
+)
+
+warehouse_dev = ResourceDefinition.hardcoded_resource(
+    WarehouseConnection(host="dev-db")
+)
+```
+
+4. **Testing and Mocking**
+
+Test assets with mocked dependencies:
+
+```python
+def test_transformed_data():
+    # Create mock data
+    mock_data = pd.DataFrame({"id": [1, 2], "name": ["A", "B"]})
+    
+    # Create mock context
+    mock_context = build_op_context(
+        resources={"warehouse": MockWarehouse(mock_data)}
+    )
+    
+    # Run the asset
+    result = transformed_data(mock_context)
+    
+    # Assert expectations
+    assert len(result) == 2
+```
+
+### Common Mistakes
+
+1. **Mixing Ops and Assets**
+
+Stick with the asset model for new development. The ops/jobs pattern is being replaced by the more intuitive asset pattern.
+
+2. **Overlooking Observability**
+
+Always add proper logging and monitoring:
+
+```python
+@asset
+def customer_metrics(context):
+    # Log the start
+    context.log.info("Starting customer metrics calculation")
+    
+    # Add timing
+    with context.get_timer("calculation_time"):
+        result = calculate_metrics()
+    
+    # Log the result shape
+    context.log.info(f"Generated {len(result)} metrics")
+    return result
+```
+
+3. **Neglecting Error Handling**
+
+Implement retries and proper failure handling:
+
+```python
+@asset(
+retry_policy=RetryPolicy(
+    max_retries=3,
+    delay=30,
+    backoff=BackoffStrategy.EXPONENTIAL
+)
+)
+def api_data():
+try:
+    return fetch_from_api()
+except TemporaryAPIError as e:
+    # This will trigger retry
+    raise Failure(
+        description=f"Temporary API error: {e}",
+        metadata={"status": "retry"}
+    )
+except PermanentAPIError as e:
+    # This won't retry
+    raise Failure(
+        description=f"Permanent API error: {e}",
+        metadata={"status": "permanent"}
+    )
+```
+
+## Putting It All Together
+
+### The Ideal Pipeline Flow
+
+```python
+# Extract with dlt
+@asset
+def raw_customers():
+return dlt.pipeline("customers_pipeline").run()
+
+# Transform with dbt
+@asset(deps=[raw_customers])
+def transformed_customers(context):
+dbt_result = subprocess.run(
+    ["dbt", "run", "--select", "marts.dim_customers"],
+    capture_output=True,
+    text=True
+)
+context.log.info(dbt_result.stdout)
+return "success" if dbt_result.returncode == 0 else "failure"
+
+# Load to destination
+@asset(deps=[transformed_customers])
+def customers_to_warehouse():
+# Push final data to destination
+return upload_to_warehouse("dim_customers")
+```
+
+### Orchestration Best Practices
+
+1. **Define explicit dependencies** between dlt extractions and dbt transformations
+2. **Schedule sensibly** based on source update frequencies
+3. **Monitor comprehensively** with alerts for both technical and data quality issues
+4. **Version control everything** - dlt extractors, dbt models, and Dagster definitions
+
+---
+description: Best practices for using dbt for transformation.
+globs: 
+alwaysApply: false
+---
+## dbt (Data Build Tool)
+
+### Core Concepts
+
+dbt handles the "T" in "ELT" through SQL-based transformations.
+
+### Best Practices
+
+1. **Model Organization**
+   
+   Follow the layer approach:
+   
+   ```
+   models/
+     staging/      # One model per source table, minimal transformations
+     intermediate/ # Reusable common logic between models
+     marts/        # Business-oriented dimensional models
+   ```
+
+2. **Testing and Documentation**
+   
+   Every model should have tests and documentation:
+   
+   ```yaml
+   version: 2
+   
+   models:
+     - name: customers
+       description: "Cleansed customer data"
+       columns:
+         - name: customer_id
+           description: "Primary key"
+           tests:
+             - unique
+             - not_null
+         - name: email
+           tests:
+             - not_null
+   ```
+
+3. **Incremental Models**
+   
+   Use incremental models for large tables:
+   
+   ```sql
+   {{
+     config(
+       materialized='incremental',
+       unique_key='id',
+       incremental_strategy='merge'
+     )
+   }}
+   
+   SELECT 
+     id,
+     name,
+     updated_at
+   FROM source_data
+   
+   {% if is_incremental() %}
+   WHERE updated_at > (SELECT max(updated_at) FROM {{ this }})
+   {% endif %}
+   ```
+
+4. **Effective Macros**
+   
+   Build reusable macros for common patterns:
+   
+   ```sql
+   {% macro date_spine(start_date, end_date) %}
+     WITH date_spine AS (
+       {{ dbt_utils.date_spine(
+           datepart="day",
+           start_date="'" + start_date + "'",
+           end_date="'" + end_date + "'"
+       ) }}
+     )
+     SELECT * FROM date_spine
+   {% endmacro %}
+   ```
+
+### Common Mistakes
+
+1. **Ignoring Referential Integrity**
+   
+   Always test for referential integrity:
+   
+   ```yaml
+   - name: order_items
+     columns:
+       - name: order_id
+         tests:
+           - relationships:
+               to: ref('orders')
+               field: id
+   ```
+
+2. **SQL Anti-Patterns**
+   
+   Avoid:
+   - Multiple CTEs doing the same work
+   - Unnecessary subqueries
+   - String manipulation when you could use a proper date/time function
+   
+   Instead, use dbt's capabilities:
+   
+   ```sql
+   -- Before
+   SELECT *,
+     CASE 
+       WHEN CAST(SUBSTR(date_string, 1, 4) AS INT) > 2020 THEN 'New'
+       ELSE 'Old' 
+     END as date_category
+   
+   -- After
+   SELECT *,
+     CASE 
+       WHEN DATE(created_at) > '2020-01-01' THEN 'New'
+       ELSE 'Old' 
+     END as date_category
+   ```
+
+3. **Overlooking Performance**
+   
+   Use appropriate materializations:
+   
+   - `view` for lightweight transformations
+   - `table` for complex queries referenced multiple times
+   - `incremental` for large tables with frequent updates
+   - `ephemeral` for simple intermediate calculations
+
+   
+

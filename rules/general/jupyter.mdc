@@ -1,0 +1,6 @@
+---
+description: 
+globs: **/*.ipynb
+alwaysApply: false
+---
+Never try to modify the notebook itself, just give code as python blocks and the user will copy paste.

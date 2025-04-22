@@ -1,0 +1,6 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+Whenever something is fixed, extract learnings/principles/guidelines from what was done and put that into a markdown file at `.dev/journal/`. We want to keep track of all of our progress so we can avoid making the same mistakes over and over. If `.dev/journal` is not a folder you can see, create a new `journal/` folder and put it there.

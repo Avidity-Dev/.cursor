@@ -1,0 +1,27 @@
+---
+description: Guidelines for environment management and configuration
+globs: ["**/config.py", "**/*.env", "**/settings.py"]
+---
+
+# ENVIRONMENT MANAGEMENT
+
+- Use .env files for local development (not committed to git)
+- Document required environment variables in README
+- Separate configurations for development, testing, and production
+- Use python-dotenv for environment variable loading
+- Implement configuration validation on startup
+
+# CONFIGURATION MANAGEMENT
+
+- Use environment variables for config
+- Separate configuration from code
+- Use YAML/JSON for complex settings
+- Implement proper defaults for optional settings
+- Document all configuration options
+
+## Security Considerations
+- Never hardcode credentials or secrets
+- Use secure storage for sensitive configuration
+- Implement proper access controls for configuration
+- Rotate secrets regularly
+- Log configuration changes 

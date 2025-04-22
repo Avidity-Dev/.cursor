@@ -1,0 +1,1 @@
+this file is a diff file - it shows the differences since my last commit. i want a summary of what has changed. if a file was deleted simply say "file x was deleted". if a file was moved (you'll see the same file deleted and created) then say "file x was moved from y to z"
