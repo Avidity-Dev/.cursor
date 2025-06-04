@@ -41,3 +41,34 @@ Each file name should start `PRD_XXX_` where XXX is an arbitraty number starting
 - Treat preliminary work as drafts for review
 - Get approval before moving to next tasks
 - Document everything in a progress report
+
+
+# Guidelines for Code Examples in PRDs
+
+When including code examples in Product Requirement Documents (PRDs) or similar planning documents, the primary goal is to clearly illustrate the intended design, critical logic, and interaction with key libraries or tools (e.g., `dlt`, specific APIs). These examples serve both human developers and AI assistants in understanding the project.
+
+## Key Principles:
+
+1.  **Illustrative, Not Exhaustive:**
+    *   Code examples should focus on the most important aspects of the proposed solution. They are not expected to be production-ready, fully error-handled, or cover every edge case unless that edge case is critical to the design being explained.
+    *   Avoid excessive boilerplate or overly detailed utility functions if they don't contribute directly to understanding the core concept being presented.
+
+2.  **Clarity of Core Logic:**
+    *   Highlight the main algorithms, data flow, and decision-making processes.
+    *   If a specific library or framework (like `dlt`) is central, showcase how its key features (e.g., sources, transformers, resources, incremental loading decorators) are intended to be used.
+
+3.  **Strategic Commenting:**
+    *   **Explain the "Why":** Comments should primarily explain *why* a certain approach is taken, *why* a specific library feature is used, or the rationale behind a non-obvious piece of logic. This is particularly helpful for AI assistants.
+    *   **Avoid Redundancy:** Do not add comments that merely restate what the code clearly does (e.g., `# assign x to y` for `y = x`).
+    *   **Tool-Specific Patterns:** If the code uses decorators or patterns specific to a tool (e.g., `@dlt.resource`, `yield dlt.mark.with_table_name(...)`), a brief comment explaining the purpose or effect of that pattern can be very beneficial.
+
+4.  **Contextual Documentation (Docstrings):**
+    *   When providing snippets that represent functions, classes, or modules, include brief docstrings (module, class, or function level) to explain the overall purpose, key parameters, and expected return values or behavior. This sets the context for the code that follows.
+
+5.  **Focus on Critical Sections:**
+    *   If certain parts of the code are absolutely critical to the design's success or scalability (e.g., ensuring stream processing for large files, specific error handling for a known problematic case), these sections should be clearly implemented or at least stubbed out with comments explaining their importance.
+
+6.  **Readability:**
+    *   Use clear variable names and maintain good formatting, even for example code.
+
+The aim is to make the PRD's code examples a useful blueprint that effectively communicates the intended design and critical implementation details to any reader, including an AI assistant tasked with further developing or analyzing the code.

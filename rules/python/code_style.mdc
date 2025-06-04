@@ -1,6 +1,7 @@
 ---
 description: Guidelines for code style, structure, and quality
-globs: ["**/*.py", "**/*.ipynb"]
+globs: *.py,*.ipynb
+alwaysApply: false
 ---
 
 # CODE STYLE AND STRUCTURE

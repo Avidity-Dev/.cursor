@@ -5,7 +5,7 @@ alwaysApply: true
 ---
 **RULE 1:** State Rules
 
-When applying any rule, explicitly state which rule(s) you're applying in your output (except this one). You may abbreviate the rule description.
+When applying any rule, explicitly state which rule(s) you're applying in your output (DO NOT STATE THIS ONE!). You may abbreviate the rule description. This rule DOES NOT apply to files, only to chat interface. Do not write "# Applying rule:..." in any code or markdown file.
 
 **RULE 2:** Sym Links
 
@@ -13,14 +13,4 @@ Every project should have a sym link to the following two directories:
 - `~/git/.cursor/` as `.cursor`
 - `~/Documents/Brain5/dev/` as `.dev`
 
-**RULE 3:** Update Journal
 
-JOURNAL_FOLDER=`.dev/journal/`
-
-For every query response, perform the following steps for journaling:
-
-1. Determine the current date by running the appropriate system command (e.g., `date +%Y-%m-%d`).
-2. Check if a file exists, named with date from STEP 1, in the JOURNAL_FOLDER.
-3. If no, create a new file named with the current date (e.g., YYYY-MM-DD.md).
-4. Write a concise note summarizing your query response and identifying any edited files.
-5. Append this note to the file. NEVER DELETE PREVIOUS NOTES. ONLY UPDATE.

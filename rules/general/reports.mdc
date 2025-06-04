@@ -19,7 +19,8 @@ CRITICAL: BEFORE adding any dates, use terminal `date` command to get the curren
 - Use consistent milestone naming across projects
 - When adding new entries, place them in appropriate sections
 - Use consistent formatting for all progress entries
-- Include specific dates and clear task descriptions
+- Include clear task descriptions and relevant status information. 
+- Overall project/phase dates (start, end) should be maintained at the top of the report or within phase summaries.
 - Cross-reference related tasks between sections when applicable
 
 ### 1.3. Tracking Changes
@@ -36,12 +37,91 @@ CRITICAL: BEFORE adding any dates, use terminal `date` command to get the curren
 
 ### 1.5. Standard Progress Documentation Format
 
-#### 1.5.1. Implementation Status
-- Track by phase with detailed task status
-- Include task name, status, dates, and notes
-- Maintain phase summaries
-- Use standard status terms (Not Started, In Progress, Completed, Blocked)
-- Always keep previous phase information intact, even when starting a new phase
+#### 1.5.1. Documenting Task & Sub-Task Progress
+
+A deliberately opinionated template for logging what's happening, what's stuck, and why it matters.
+
+---
+
+1 . Purpose
+
+Give the AI (and your teammates) a single, unambiguous format for tracking progress in narrative-style status reports—rich enough for code snippets and rabbit-hole details, yet rigid enough that a parser can slice it up without guessing.
+
+---
+
+2 . Template - copy-paste and fill in
+
+```markdown
+* **Task:** <clear, action-oriented name>
+  **Status:** Not Started | In Progress | Completed | Blocked
+  **Notes:** <any depth of commentary; back-ticks for code/paths>
+
+    * **Sub-Task:** <optional child item>
+      **Status:** …
+      **Notes:** …
+```
+
+*   Use a leading `*` for every list item.
+*   Indent sub-tasks two spaces beneath their parent—nothing fancy, just reliable Markdown.
+*   Maintain the exact bold labels (**Task:**, **Sub-Task:**, **Status:**, **Notes:**). This is the contract the AI leans on.
+
+---
+
+3 . Attribute definitions
+
+*   **Task:** / **Sub-Task:**
+    *   **Required?** Yes
+    *   **Allowed values / format:** A short imperative or noun-phrase
+    *   **Commentary:** If it needs two commas, split it into a sub-task. E.g., "Set up CI"
+*   **Status:**
+    *   **Required?** Yes
+    *   **Allowed values / format:** `Not Started`, `In Progress`, `Completed`, `Blocked`
+    *   **Commentary:** Use these four and only these four—no "Done-ish", no emojis.
+*   **Notes:**
+    *   **Required?** Yes
+    *   **Allowed values / format:** Free-form Markdown; bullets, links, stack traces, etc.
+    *   **Commentary:** Wrap filenames, CLI commands, or code in back-ticks so they stand out.
+
+Dates are explicitly banned inside this block—keep them in the phase header or summary table. That prevents timestamp clutter and lets the AI calculate slippage elsewhere.
+
+---
+
+4 . Operational ground rules
+
+1.  **Hierarchy is sacred.** Tasks own sub-tasks; never list siblings on the same indent unless they really are siblings.
+2.  **Immutable history.** When you start a new phase, append a new section—don't rewrite old status lines. Past mistakes are data, not embarrassment.
+3.  **Line length sanity.** Cap single lines around 80 chars; if your notes need a novella, use indented sub-bullets inside **Notes:**.
+4.  **Consistent ordering.** Always present attributes in the order: **Task** → **Status** → **Notes**. The AI's regexes thank you.
+5.  **Clarity beats cleverness.** If you're tempted to get cute with Markdown tricks, resist; a plain list is predictable and therefore machine-friendly.
+
+---
+
+5 . Worked example
+
+```markdown
+* **Task:** Deploy monitoring stack  
+  **Status:** In Progress  
+  **Notes:** Provisioned `terraform/monitoring`. Grafana comes up on :3000 but
+  dashboards are empty; suspect alert rules not imported.
+
+    * **Sub-Task:** Configure Prometheus alerts  
+      **Status:** Not Started  
+      **Notes:** Will replicate critical alert set from `prod/alerts.yaml`.
+
+    * **Sub-Task:** Wire Grafana to Slack  
+      **Status:** Blocked  
+      **Notes:** Slack webhook returns 403. Waiting on SecOps to whitelist IP.
+```
+
+Why it works: the high-level task tells you what we're doing; each sub-task drills down; statuses are atomic; notes capture both what happened and why.
+
+---
+
+6 . Why this beats a table
+
+Tables look tidy until you need to paste a stack trace or a five-line SQL snippet—then they explode sideways. This list keeps the hierarchy obvious, preserves Markdown compatibility, and lets you dump as much diagnostic detail as necessary without cramming it into a single cell.
+
+Use it religiously; the AI will reward you with dead-on progress summaries and zero confusion about what's done, what's blocked, and what still languishes in backlog purgatory.
 
 #### 1.5.2. Error Log
 - Document errors with description, root cause, solution, and prevention

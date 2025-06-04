@@ -3,22 +3,28 @@ description: Create Mermaid Diagrams.
 globs: 
 alwaysApply: false
 ---
-# Mermaid Flowchart Syntax Guidelines
+# Mermaid Flowchart & Block‑Diagram Guidelines (v2)
 
-This document captures best practices and troubleshooting tips for writing Mermaid flowchart diagrams, based on issues encountered with specific renderers (like the one used in Cursor).
+> "No renderer expects the Spanish Inquisition!" – *also true for extra semicolons.*
 
-## General Principles
+---
+## 1  General Principles
 
-*   **Start Simple:** Begin with basic node and edge definitions. Add complexity (subgraphs, styling, complex labels) incrementally.
-*   **Check Renderer:** Be aware that different Mermaid renderers (online editors, IDE extensions, command-line tools) might have slightly different levels of strictness or support for advanced features. If you encounter errors, try simplifying the syntax first.
+* **Start simple, iterate often.** Add one feature at a time so you can spot the guilty line when the diagram explodes.
+* **Mind the renderer.** Online Live Editor is the most permissive; IDE plug‑ins (looking at you, Cursor) can be pickier.
 
-## Common Pitfalls & Solutions
+---
+## 2  Common Flowchart Pitfalls
 
-### 1. Avoid Trailing Semicolons
+| 🔥 Don't | ✅ Do |
+|---------|------|
+| Trailing `;` after nodes | Drop the semicolon |
+| Parentheses **inside** node text | Escape them or remove them |
+| `%% inline comment` at line end | Put comments on their own line |
 
-Mermaid flowchart syntax generally does **not** require or expect semicolons at the end of node or edge definition lines. Adding them can cause parsing errors.
+### 2.1 Examples of Common Pitfalls
 
-**Incorrect:**
+**Incorrect (with trailing semicolons):**
 
 ```mermaid
 graph TD
@@ -32,11 +38,7 @@ graph TD
     A[Node A] --> B(Node B)
 ```
 
-### 2. Parentheses in Node Labels
-
-Using parentheses `()` directly within the text label of certain node shapes (like standard rectangles `[...]` or rhombus shapes `{...}`) can sometimes confuse parsers.
-
-**Potentially Problematic:**
+**Potentially Problematic (parentheses in labels):**
 
 ```mermaid
 graph TD
@@ -52,13 +54,8 @@ graph TD
         E --> F{Calls Repo Interface}
         L --> M[Calls Native App Procedure geocode_forward_enrich]
     ```
-*   **Use HTML Entities (Advanced):** For renderers that support it, HTML character codes *might* work, but increase complexity. (e.g., `&#40;` for `(` and `&#41;` for `)`). Use with caution.
 
-### 3. Comment Placement
-
-Inline comments (`%% ...`) placed *after* a node or edge definition on the same line can cause parsing errors in some renderers.
-
-**Incorrect:**
+**Incorrect (inline comment after node):**
 
 ```mermaid
 graph TD
@@ -67,18 +64,125 @@ graph TD
 
 **Correct:**
 
-Place comments on their own line, ideally *before* the element they describe.
-
 ```mermaid
 graph TD
     %% Repo creates GeocodeResult
     N --> H 
 ```
 
-## Debugging Tips
+---
+## 3  Block‑Beta / **block** Diagram Cheat‑Sheet
 
-*   **Isolate the Error:** Comment out sections of your diagram (using `%%` at the start of lines) until the error disappears. This helps pinpoint the problematic line(s).
-*   **Validate Online:** Paste your code into a reliable online Mermaid editor (like the official Mermaid Live Editor) to see if the error persists there. This helps determine if it's a syntax error or a limitation of your specific renderer.
-*   **Consult Documentation:** Refer to the official Mermaid documentation for the specific syntax rules for flowcharts, nodes, and edges.
+### 3.1 Skeleton
+```mermaid
+block-beta
+columns 2
+    src["SOURCE"]
+    space          %% intentional gap (1 col)
+    stage:2["STAGE – spans 2 cols"]
+    blockArrowX<["Deploy"]>(down)
+    tgt("TARGET")
+```
 
-By following these guidelines, we can create clearer and more reliably rendered Mermaid diagrams.
+### 3.2 Making Blocks
+| Syntax | Meaning |
+|--------|---------|
+| `nodeId["Label"]` | Regular block (1 column) |
+| `nodeId:3["Label"]` | Same block but 3 columns wide |
+| `space` or `space:2` | Invisible spacer occupying 1 or N columns ([mermaid.js.org](mdc:https:/mermaid.js.org/syntax/block.html)) |
+| `block NAME … end` | *Optional* container when you need nesting (otherwise skip) |
+
+### 3.3 Block Arrows (directional blocks)
+Block arrows are **nodes**, not links.  
+Syntax → `arrowId<["Label"]>(dir)` where `dir` is `up`, `down`, `left`, or `right` ([mermaid.js.org](mdc:https:/mermaid.js.org/syntax/block.html))
+
+* **Empty label?** The parser insists on *something* between the quotes. Use a non‑breaking space: `arrowId<["&nbsp;"]>(right)`.
+* Style them like any other node: `style arrowId fill:#ffd,stroke:#333`.
+
+### 3.4 Connecting Things
+Use regular link arrows **outside** the column block definitions so layout isn't affected:
+```mermaid
+block-beta
+columns 1
+    A["FETCH"]
+    blockArrow1<["parse"]>(down)
+    B["TRANSFORM"]
+
+A -->|"raw json"| blockArrow1
+blockArrow1 --> B
+```
+Labels are optional; omit the pipe section entirely for an unlabeled edge.
+
+### 3.5 Working Block-Beta Example (Data Architecture)
+
+```mermaid
+block-beta
+columns 1
+    sources["SOURCE SYSTEMS<br>External APIs"]
+    ingest["INGEST<br>Raw Data"]
+    processing["PROCESSING<br>Transformation"]
+    storage["STORAGE<br>Final Data"]
+    
+    style sources fill:#f9f,stroke:#333,stroke-width:2px
+    style ingest fill:#ccf,stroke:#333,stroke-width:2px
+    style processing fill:#ffc,stroke:#333,stroke-width:2px
+    style storage fill:#cfc,stroke:#333,stroke-width:2px
+```
+
+### 3.6 Block-Beta Best Practices
+
+1. **Start with declaration:** Begin with `block-beta` on its own line
+2. **Specify columns:** For vertical stacking, use `columns 1` 
+3. **Define nodes directly:** No need to use `block:NAME` and `end` syntax (unless needed for nesting)
+4. **Use quotes for node labels:** Define nodes as `nodeid["Label"]`
+5. **Add line breaks with HTML:** Use `<br>` for multi-line labels
+6. **Style individual nodes:** Use `style nodeid fill:#color,...` 
+7. **Avoid empty blockArrows:** Always include a label or `&nbsp;`
+
+---
+## 4 Colour Hints (data‑warehouse vibe)
+| Layer | Hex | Example |
+|-------|-----|---------|
+| Raw / Bronze | `#f9f` | `style raw fill:#f9f` |
+| Silver / Cleansed | `#ccf` | `style silver fill:#ccf` |
+| Gold | `#ffc` | `style gold fill:#ffc,color:#000` |
+| Marts / BI | `#cfc` | `style marts fill:#cfc` |
+| External systems | `#fcf` + `stroke-dasharray:5` | `style external fill:#fcf,stroke-dasharray:5` |
+
+### 4.1 Data Pipeline Architecture Example
+
+For data pipeline architectures like medallion architecture, the following pattern works reliably:
+
+```mermaid
+block-beta
+columns 1
+    sources["SOURCE SYSTEMS<br>CRM, API"]
+    raw["RAW<br>Bronze Layer"]
+    silver["SILVER<br>Cleansed Data"]
+    gold["GOLD<br>Business Entities"]
+    marts["MARTS<br>Analytics Views"]
+    
+    style sources fill:#f9f,stroke:#333,stroke-width:2px
+    style raw fill:#f9f,stroke:#333,stroke-width:2px
+    style silver fill:#ccf,stroke:#333,stroke-width:2px
+    style gold fill:#ffc,stroke:#333,stroke-width:2px,color:#000
+    style marts fill:#cfc,stroke:#333,stroke-width:2px
+```
+
+---
+## 5 Debugging Like a Pro
+1. **Binary search your diagram.** Comment out half, re‑render, repeat.
+2. **Validate upstream.** If it works in the Mermaid Live Editor but not in Cursor, it's a Cursor renderer quirk.
+3. **Check invisible characters.** Tabs or non‑breaking spaces inside code fences sometimes break parsing.
+4. **Fallback plan.** When `block-beta` fights you, retreat to `graph TD` sub‑graphs – win the battle, then return.
+5. **Simplify First:** When encountering errors, start with the simplest version of your diagram and add complexity gradually.
+6. **Isolate Elements:** If working with links between components, define the components first, then add the links at the end.
+
+---
+## 6 Quick Reference
+```
+%% One‑liner crib‑sheet – paste at top of every new diagram
+%% block‑beta | space | nodeId:width["Label"] | arrowId<["Label"]>(dir) | --> linkLabel -->
+```
+
+May your arrows always point the right way, and may your nodes never say *Ni!*
