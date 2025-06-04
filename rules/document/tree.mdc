@@ -1,7 +1,7 @@
 ---
-description: Generate project structure documentation
+description: 
 globs: 
-alwaysApply: true
+alwaysApply: false
 ---
 # Maintain Repository Structure
 
