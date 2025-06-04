@@ -1,0 +1,52 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# dlt Pattern: Ingesting Veeva API Tarballs
+
+This rule outlines the recommended approach for ingesting data from Veeva's Direct Data API (which provides data as `.tar.gz` archives) into a data warehouse (e.g., Snowflake) using the `dlt` (data-load tool) library.
+
+## Core Pipeline Architecture
+
+The pipeline leverages `dlt` for extracting, transforming (unpacking), and loading data. A comprehensive plan and example implementation details can often be found in a project-specific PRD, such as the one located at [.dev/using_dlt.md](mdc:prometheus/.dev/using_dlt.md).
+
+1.  **Intermediate Cloud Storage (Landing Zone):**
+    *   **Best Practice:** Veeva `.tar.gz` exports should first be landed in a cloud blob storage service (e.g., Azure Blob Storage, AWS S3, Google Cloud Storage).
+    *   **Benefits:** Decoupling, resilience, raw data archive for reprocessing/auditing, efficient `dlt` source interaction.
+    *   The `dlt` pipeline reads from this landing zone.
+
+2.  **`dlt.sources.filesystem` for Tarball Discovery:**
+    *   Use `dlt.sources.filesystem` to discover the `.tar.gz` files in the landing zone.
+    *   **Incremental Processing:** Configure this source with `incremental=dlt.sources.incremental.last_modified()` (or a similar strategy) to ensure each tarball is processed only once by the pipeline.
+
+3.  **Custom `dlt.transformer` for Unpacking & Parsing (`read_tar_gz`):**
+    *   A Python function decorated with `@dlt.transformer` is essential to handle the tarballs.
+    *   **CRITICAL - Tarball Streaming:**
+        *   The transformer *must* process the tarball content as a stream to avoid out-of-memory errors with large files.
+        *   It receives a file item from the `filesystem` source. The file stream should be obtained via `file_item.open("rb")`.
+        *   This raw binary stream should be passed directly to `tarfile.open(fileobj=raw_stream, mode="r:gz")`. Do NOT read the entire stream into an in-memory buffer (like `io.BytesIO(raw_stream.read())`) before passing to `tarfile`.
+    *   **Manifest Parsing (`manifest.csv`):**
+        *   The transformer should attempt to read a `manifest.csv` file within the tarball. This manifest typically lists the internal data files, their paths, and can be used to derive target table names.
+        *   Implement robust fallback logic if the manifest is missing or unparsable (e.g., scan the tarball for all `.csv` or relevant data files).
+    *   **Data File Parsing:** Parse the content of identified internal data files (commonly CSVs, use `csv.DictReader` with `io.TextIOWrapper` for correct encoding).
+    *   **Dynamic Table Naming:** Yield data batches (e.g., lists of dictionaries) using `dlt.mark.with_table_name(data_batch, derived_table_name)` to ensure `dlt` routes data to the correct tables in the destination.
+
+4.  **`dlt.pipeline` Configuration:**
+    *   Define the pipeline with a clear `pipeline_name`, the `destination` (e.g., "snowflake"), and a `dataset_name` (target schema).
+
+## Veeva API Specifics
+
+*   Refer to the `veeva-direct-data-api-usage` rule for more general details on the Veeva Direct Data API itself (file types, naming conventions, etc.).
+*   Ensure any pre-processing steps mentioned in `veeva-direct-data-api-usage`, like concatenating multipart files, are handled *before* the `.tar.gz` files reach the landing zone for this `dlt` pipeline. This pipeline expects complete tarball streams.
+
+## Development & Testing
+
+*   **Test-Driven Development (TDD):** Strongly recommended for the custom transformer (`read_tar_gz`).
+*   **Key TDD Focus Areas:**
+    *   Correct streaming implementation (verify no full in-memory buffering of tarballs).
+    *   Robust manifest parsing and fallback logic.
+    *   Accurate data file parsing and association with table names.
+    *   Graceful error handling (corrupted tar members, unparsable internal files).
+
+By following these principles, you can build a scalable and resilient `dlt` pipeline for Veeva data.

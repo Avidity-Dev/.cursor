@@ -1,0 +1,310 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# Documentation Standards
+
+<!-- TABLE OF CONTENTS -->
+- [Executive Summary](mdc:#executive-summary)
+- [Analysis Process Before Documenting](mdc:#analysis-process-before-documenting)
+- [Top-Level (Module/File) Documentation](mdc:#top-level-modulefile-documentation)
+- [Class & Method Documentation](mdc:#class--method-documentation)
+- [NumPy Documentation Standard](mdc:#numpy-documentation-standard)
+- [Inline Comments](mdc:#inline-comments)
+- [Variable & Function Naming](mdc:#variable--function-naming)
+- [API Documentation](mdc:#api-documentation)
+- [Project Documentation](mdc:#project-documentation)
+- [Code Formatting](mdc:#code-formatting)
+- [Documentation Priority & Depth](mdc:#documentation-priority--depth)
+- [AI-Friendly Annotations](mdc:#ai-friendly-annotations)
+- [Strategic Commenting Checklist](mdc:#strategic-commenting-checklist)
+- [Security Documentation](mdc:#security-documentation)
+- [Red Flag Comments](mdc:#red-flag-comments)
+
+## Executive Summary
+
+This document provides comprehensive guidelines for creating effective code documentation that serves both human developers and AI systems. Key principles include:
+
+1. **Document purpose and context** rather than just implementation details
+2. **Prioritize external interfaces** first, business logic second, and utilities last
+3. **Use the NumPy docstring format** for all Python code
+4. **Include AI-friendly annotations** to help with automated analysis
+5. **Document security considerations** explicitly for critical components
+
+Good documentation helps current developers understand implementation choices, future maintainers adapt the code safely, and AI systems assist effectively with code comprehension and generation.
+
+## Analysis Process Before Documenting {#analysis-process}
+1. First analyze the code to understand its overall structure and functionality
+2. Identify key components, functions, loops, conditionals, and complex logic
+3. Determine which elements require explanation based on complexity and importance
+4. Add comments strategically where they provide the most value
+
+## Top-Level (Module/File) Documentation {#top-level-docs}
+<!-- PRIORITY: MUST-HAVE -->
+
+For Python, always use NumPy-style module documentation:
+
+```python
+"""
+Module Name
+===========
+
+Brief one-line description.
+
+Description
+-----------
+More detailed description of what the module does and its purpose.
+
+Dependencies
+-----------
+- dependency1: Purpose of this dependency
+- dependency2: Purpose of this dependency
+
+Notes
+-----
+Any important implementation notes, design decisions, or other details.
+
+Examples
+--------
+>>> import module
+>>> module.function()
+result
+"""
+```
+
+## Class & Method Documentation {#class--method-documentation}
+<!-- PRIORITY: MUST-HAVE -->
+
+**ALWAYS use NumPy docstring format for Python code.**
+
+See the [NumPy Documentation Standard](mdc:#numpy-documentation-standard) section for detailed examples and formatting rules.
+
+## NumPy Documentation Standard {#numpy-documentation-standard}
+<!-- PRIORITY: MUST-HAVE -->
+
+The NumPy documentation standard is **mandatory** for all Python code in this project. It uses a structured format with section headers that are underlined with hyphens.
+
+### Module Docstring Format
+
+```python
+"""
+Module Title
+===========
+
+One-sentence summary of module purpose.
+
+Description
+-----------
+Extended description of the module's functionality,
+implementation details, and usage guidance.
+
+Dependencies
+-----------
+- package1: Purpose of this dependency
+- package2: Purpose of this dependency
+
+Notes
+-----
+Implementation notes, design decisions, or limitations.
+
+Examples
+--------
+>>> import module
+>>> module.function()
+result
+"""
+```
+
+### Class Docstring Format
+
+```python
+class ClassName:
+    """
+    Brief class description.
+
+    Detailed description of the class, its purpose,
+    and how it fits into the larger system.
+
+    Attributes
+    ----------
+    attr1 : type
+        Description of attribute
+    attr2 : type
+        Description of attribute
+
+    Methods
+    -------
+    method1(param1, param2)
+        Brief description of method1
+    method2()
+        Brief description of method2
+    """
+```
+
+### Method/Function Docstring Format
+
+```python
+def function_name(param1, param2, param3="default"):
+    """
+    Brief description of function purpose.
+
+    More detailed description if needed that explains
+    what the function does in greater detail.
+
+    Parameters
+    ----------
+    param1 : type
+        Description of first parameter
+    param2 : type
+        Description of second parameter
+    param3 : type, optional
+        Description of third parameter, by default "default"
+
+    Returns
+    -------
+    type
+        Description of return value
+
+    Raises
+    ------
+    ExceptionType
+        When and why this exception is raised
+
+    Notes
+    -----
+    Any additional implementation notes or details
+
+    Examples
+    --------
+    >>> function_name(1, "test")
+    expected_result
+    """
+```
+
+### Key Features of NumPy Documentation
+
+1. **Section Headers with Underlines**: Each section header is followed by a row of hyphens of the same length
+2. **Consistent Parameter Formatting**: `parameter_name : type` followed by indented description
+3. **Type Documentation**: Types are explicit in parameter and return value sections
+4. **Standardized Sections**: Follows a consistent order of sections
+5. **Optional Sections**: Include only sections that are relevant to the specific function/class
+6. **Examples**: Include executable examples where helpful
+
+## Inline Comments {#inline-comments}
+<!-- PRIORITY: RECOMMENDED -->
+- Use inline comments sparingly but strategically
+- Focus on explaining the "why" rather than the "what"
+- Comment on:
+  - Business logic that implements specific requirements
+  - Non-obvious optimizations or workarounds
+  - Security considerations
+  - Edge case handling
+- Avoid redundant comments that merely restate the code
+
+### Before and After Examples
+
+**❌ Poor inline comments:**
+```python
+# Loop through list
+for item in items:
+    # Get the value
+    value = item.value
+    # Add to total
+    total += value
+```
+
+**✅ Good inline comments:**
+```python
+# Process only active items to calculate billing totals
+for item in items:
+    # Skip archived items which should not affect billing
+    if item.status == "archived":
+        continue
+    
+    total += item.value
+```
+
+## Variable & Function Naming {#variable--function-naming}
+<!-- PRIORITY: MUST-HAVE -->
+- Prefer descriptive names that make the code self-documenting
+- Use consistent naming conventions throughout the codebase
+- When domain-specific terminology is used, explain it in comments
+
+## API Documentation {#api-documentation}
+<!-- PRIORITY: MUST-HAVE -->
+- Document all API endpoints thoroughly
+- Include request/response formats and examples
+- Document authentication requirements
+- Explain error responses and handling
+
+### API Documentation Checklist
+- [ ] Endpoint purpose described
+- [ ] HTTP methods documented (GET, POST, etc.)
+- [ ] URL parameters explained
+- [ ] Request body schema defined
+- [ ] Response format and status codes documented
+- [ ] Error scenarios and error response formats included
+- [ ] Authentication requirements specified
+- [ ] Rate limits or other constraints noted
+- [ ] Example requests and responses provided
+
+## Project Documentation {#project-documentation}
+<!-- PRIORITY: MUST-HAVE -->
+- Maintain a comprehensive README with:
+  - Project overview and purpose
+  - Setup and installation procedures
+  - Usage examples
+  - Configuration options and environment variables
+- Document permission requirements for different operations
+- Create and maintain architectural diagrams when helpful
+- Keep all documentation synchronized with code changes
+- Regularly review and update documentation as the code evolves
+
+## Code Formatting {#code-formatting}
+<!-- PRIORITY: RECOMMENDED -->
+- When adding comments, always preserve the original code's formatting and structure
+- Keep indentation, line breaks, and spacing consistent with the existing code style
+- Position comments to minimize disruption to code readability
+- For languages with style guides (e.g., PEP 8 for Python), follow those conventions
+
+## Documentation Priority & Depth {#documentation-priority--depth}
+<!-- PRIORITY: MUST-HAVE -->
+- Prioritize **external-facing interfaces and APIs** first. These are most likely to be consumed by other teams or clients.
+- Next, document **core business logic** and algorithms that underpin crucial product behavior.
+- Finally, cover supporting utility code.  
+Use this order when tackling documentation backlogs or writing docs for new features.
+
+## AI-Friendly Annotations {#ai-friendly-annotations}
+<!-- PRIORITY: RECOMMENDED -->
+Introduce lightweight tags that help AI tools parse intent without cluttering human readability:
+- `# AI_DOC:` – high-level rationale a model can read quickly.
+- `# AI_NOTE:` – nuanced implementation detail that an LLM may need for accurate refactoring.
+- `# AI_CONTEXT:` - broader system context that helps with understanding relationships.
+- `# AI_WARN:` - potential pitfalls or areas requiring special attention.
+
+Keep tags concise; they should complement, not replace, regular comments/docstrings.
+
+## Strategic Commenting Checklist {#commenting-checklist}
+Before adding a comment ask:
+1. Does it explain a **decision that's non-obvious**?
+2. Will it **prevent common misuse** or misunderstanding?
+3. Does it encode **domain knowledge** not obvious from code?
+4. Is it about **security, performance, or edge-cases**?
+If the answer to none of these is *yes*, reconsider adding the comment.
+
+## Security Documentation {#security-documentation}
+<!-- PRIORITY: MUST-HAVE -->
+For any security-critical component add a dedicated section:
+- **Threat Model** – enumerate realistic attack vectors.
+- **Mitigation Strategy** – describe how the code prevents or limits each threat.
+- **Assumptions & Invariants** – e.g., *JWT secret stored in env var*.
+
+## Red Flag Comments {#red-flag-comments}
+<!-- PRIORITY: RECOMMENDED -->
+Help identify problematic patterns in code with clear red flag comments:
+
+```python
+# ❌ Don't: # increment counter
+# ✅ Do:    # Track retry attempts to prevent infinite loops
+```

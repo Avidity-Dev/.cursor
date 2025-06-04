@@ -1,0 +1,261 @@
+# PRD_018_Phase2_Unpack_Cleanup: Veeva CRM Archive Unpacking & Basic File Preparation
+
+## Table of Contents
+
+- [1. Motivation & Context](#1-motivation--context)
+- [2. Project Goals](#2-project-goals)
+- [3. Scope](#3-scope)
+  - [3.1. In Scope](#31-in-scope)
+  - [3.2. Out of Scope](#32-out-of-scope)
+- [4. Technical Approach](#4-technical-approach)
+  - [4.1. Overview](#41-overview)
+  - [4.2. Key Components](#42-key-components)
+    - [4.2.1. Dagster Asset (`prometheus/veeva/assets.py`)](#421-dagster-asset)
+    - [4.2.2. Archive Handling (`prometheus/veeva/archive.py` - New)](#422-archive-handling)
+    - [4.2.3. ADLS Interaction](#423-adls-interaction)
+    - [4.2.4. Dagster Resources](#424-dagster-resources)
+  - [4.3. Secrets Management](#43-secrets-management)
+  - [4.4. ADLS Output for Unpacked Files](#44-adls-output-for-unpacked-files)
+- [5. Implementation Tasks](#5-implementation-tasks)
+- [6. Success Criteria](#6-success-criteria)
+- [7. Key Dependencies & Assumptions](#7-key-dependencies--assumptions)
+- [8. Future Considerations (Post-MVP)](#8-future-considerations)
+- [9. Documentation Requirements](#9-documentation-requirements)
+
+## 1. Motivation & Context
+
+This document outlines Phase 2 of the Veeva CRM data integration, focusing on unpacking the raw data archives fetched in Phase 1 (PRD_018_Phase1_fast_MVP.md, Linear Task AAA-317). The primary objective is to create a Dagster asset that takes a `.tar.gz` archive from Azure Data Lake Storage (ADLS), unpacks its contents (primarily CSV files), performs minimal necessary cleanup, and stores these individual files in a "processed" or "unpacked" location within ADLS.
+
+This step is crucial for making the raw Veeva CRM data accessible for subsequent processing, staging, and loading into a data warehouse. The focus for this phase is on the unpacking mechanism and basic file preparation, deferring complex data validation and transformation.
+
+This PRD addresses Linear task AAA-318: "Veeva CRM Direct Data ZIP Unpacking and Cleanup Asset". While the task mentions "ZIP", Veeva Direct Data API exports are typically `.tar.gz` archives; this PRD will assume `.tar.gz` as the primary format, utilizing Python's `tarfile` module.
+
+## 2. Project Goals
+
+*   Develop a Dagster asset that depends on the output of the Phase 1 Veeva raw export asset.
+*   Reliably download `.tar.gz` archives from a specified ADLS location configured for raw exports via the `VeevaCRMVaultAdlsStorageResource`.
+*   Unpack the archive, extracting constituent files (especially CSVs).
+*   Perform basic cleanup/preparation of these files (e.g., identify key data files, ensure consistent naming if needed).
+*   Upload the extracted and prepared files to a designated "unpacked" or "processed" location in ADLS, configured via a separate instance of the `VeevaCRMVaultAdlsStorageResource`.
+*   Prioritize a robust unpacking mechanism; extensive cleaning logic is secondary for this phase.
+
+## 3. Scope
+
+### 3.1. In Scope
+
+*   **ADLS Interaction**:
+    *   Download `.tar.gz` archives from the ADLS location populated by the `veeva_crm_vault_raw_full_export_to_adls` asset. This location is configured via the `target_path_prefix` of a `VeevaCRMVaultAdlsStorageResource` instance.
+    *   Upload extracted files (primarily CSVs) to a new, designated "unpacked" path prefix in ADLS, configured via the `target_path_prefix` of a separate `VeevaCRMVaultAdlsStorageResource` instance, ensuring idempotency (e.g., by not overwriting existing identical files or using blob leases).
+    *   Utilize the existing `AzureBlobStore` client (`prometheus/azure/blob.py`).
+*   **Archive Unpacking**:
+    *   Handle `.tar.gz` archives.
+    *   Extract all files from the archive. Prioritize in-memory processing, falling back to temporary local disk usage (with proper hygiene using `tempfile.TemporaryDirectory`) only if necessary for very large archives not suitable for full in-memory streaming. Support streaming of file contents directly from the archive to ADLS for large individual files to manage memory.
+*   **File Identification & Basic Preparation**:
+    *   Identify primary data files (e.g., CSVs).
+    *   Potentially filter out non-essential files (e.g., manifest files, if not needed downstream).
+    *   Ensure extracted filenames are suitable for ADLS storage.
+    *   Minimal cleanup: for this MVP, this means ensuring files are correctly extracted. More advanced cleaning (header manipulation, deep character encoding fixes) is out of scope unless trivially solvable during extraction.
+*   **Dagster Orchestration**:
+    *   Create a new Dagster asset, likely named `veeva_crm_vault_unpacked_files_to_adls`, that depends on the asset created in Phase 1.
+    *   The asset will operate on a single archive per run (corresponding to one run of the upstream asset).
+*   **Error Handling**: Basic error handling for ADLS operations and archive unpacking. Idempotent retries where appropriate.
+*   **Logging**: Basic logging of asset execution, files processed, and output locations. Logs should follow a defined structured format (e.g., JSON) for easier parsing and analysis.
+*   **Path Naming**: Implement a deterministic and centralized path naming convention for unpacked files in ADLS.
+
+### 3.2. Out of Scope
+
+*   **Complex Data Validation**: No schema validation, data type checking, or content validation of the CSV files.
+*   **Advanced Data Cleaning/Transformation**: No complex data manipulation, record deduplication, advanced character encoding resolution (beyond what `tarfile` or basic Python handles), or business logic transformations.
+*   **Handling of other archive types besides `.tar.gz`**: If Veeva produces other formats, they are not covered in this phase.
+*   **Incremental Processing within Archive**: The entire archive is processed; no logic to only process certain files within an archive based on changes.
+*   **Automated Scheduling**: The asset will be manually triggerable or triggered upon materialization of its upstream dependency. Specific scheduling setup is deferred.
+*   **Advanced Observability**: Complex monitoring or alerting beyond basic Dagster logs.
+
+## 4. Technical Approach
+
+### 4.1. Overview
+
+A new Dagster asset will be created. This asset will be downstream of the `veeva_crm_vault_raw_full_export_to_adls` asset from Phase 1. Upon invocation (e.g., triggered by the materialization of an upstream archive), it will:
+1.  Identify the `.tar.gz` archive in the "raw" ADLS location (passed via upstream asset's Output metadata or by convention).
+2.  Download the archive. For individual large files within the archive, prefer streaming directly from the archive to the upload destination. If the entire archive must be downloaded first and is very large, use a temporary local file with proper hygiene (e.g., `tempfile.TemporaryDirectory`).
+3.  Unpack the `.tar.gz` archive using Python's `tarfile` module, potentially streaming contents for large members.
+4.  Iterate through the extracted members. For each relevant file (e.g., CSVs):
+    *   Read its content (or stream it).
+    *   Perform any minimal, in-scope cleanup/preparation.
+    *   Upload the file content to a "processed" location in ADLS using a deterministic path, maintaining a meaningful path structure and ensuring idempotency (e.g., `overwrite=False`).
+5.  Yield `Output` metadata about the processed files and their new ADLS locations.
+
+### 4.2. Key Components
+
+#### 4.2.1. Dagster Asset (`prometheus/veeva/assets.py`)
+
+*   `@asset async def veeva_crm_vault_unpacked_files_to_adls(upstream_export_metadata: Output, ...)`:
+    *   Takes `VeevaCRMVaultAdlsStorageResource` (configured for the unpacked data location) and potentially the output metadata from the upstream asset (to know which archive to process).
+    *   **Logic**:
+        1.  Get `AzureBlobStore` instance.
+        2.  Determine the source ADLS blob path for the `.tar.gz` archive using `upstream_export_metadata` or convention.
+        3.  Download the archive blob content (e.g., `store.download_file_to_bytes(blob_name)` or stream if large).
+        4.  Use functions from `prometheus/veeva/archive.py` to unpack the archive. This will involve streaming file content for large files directly to the upload step.
+        5.  For each extracted file deemed relevant:
+            *   Construct a target ADLS blob name/path in the "unpacked" area using a centralized helper function (`build_unpacked_blob_name` utility).
+            *   Upload the file content using `store.upload_file(file_data=member_content_stream, file_name=target_blob_name, overwrite=False)`. The `member_content_stream` would be a file-like object obtained from `tarfile.extractfile(member)`.
+        6.  Yield `Output` with metadata about the processed files and their new ADLS locations.
+
+#### 4.2.2. Archive Handling (`prometheus/veeva/archive.py` - New)
+
+A new Python module responsible for archive-specific operations.
+*   **`unpack_and_stream_tar_gz_members(tar_gz_bytes_or_stream) -> Iterable[tuple[str, IO[bytes]]]` (or similar streaming approach)**:
+    *   Takes bytes or a stream of a `.tar.gz` file.
+    *   Uses `io.BytesIO` (if bytes input) and `tarfile` to open and read the archive.
+    *   Yields tuples of (member filename, member content stream) for regular files. This allows the calling function to stream the content directly to ADLS.
+    *   Handles potential issues during extraction (e.g., corrupted archive).
+*   May include helper functions to filter relevant files (e.g., by extension like `.csv`).
+*   Consider extracting or generating a `metadata.json` file from the archive if one exists or can be created, which describes the archive's contents (as a quick win).
+
+```python
+# Example structure for prometheus/veeva/archive.py
+import io
+import tarfile
+from typing import Dict, Iterable, Tuple, IOBase, Union
+
+def unpack_and_stream_tar_gz_members(tar_gz_source: Union[bytes, IOBase]) -> Iterable[Tuple[str, IOBase]]:
+    """
+    Unpacks a .tar.gz archive and streams its member contents.
+
+    Args:
+        tar_gz_source: The byte content of the .tar.gz file or a file-like object.
+
+    Yields:
+        Tuples of (member filename, member content stream [file-like object]).
+        Filters for regular files only.
+    """
+    # AI_DOC: This function provides a generic way to unpack tar.gz members by streaming,
+    # which is crucial for in-memory processing of archives and uploading large files to ADLS
+    # without loading the entire file content into memory at once.
+    
+    if isinstance(tar_gz_source, bytes):
+        tar_gz_source = io.BytesIO(tar_gz_source)
+
+    with tarfile.open(fileobj=tar_gz_source, mode="r:gz") as tar:
+        for member in tar.getmembers():
+            if member.isfile():
+                # AI_NOTE: extractfile returns a file-like object that can be streamed.
+                # This is critical for handling large files within the tar efficiently.
+                file_content_bio = tar.extractfile(member)
+                if file_content_bio:
+                    yield member.name, file_content_bio
+    # Consider extracting/creating a metadata.json here if applicable
+    # For example, if a manifest file exists, yield it as ('metadata.json', manifest_stream)
+    # or generate one based on tar.getmembers()
+
+def filter_csv_files_from_stream(extracted_files_stream: Iterable[Tuple[str, IOBase]]) -> Iterable[Tuple[str, IOBase]]:
+    """
+    Filters a stream of extracted files to include only CSVs.
+    Assumes CSVs have a '.csv' extension, case-insensitive.
+    """
+    # AI_DOC: Simple utility to isolate CSV files from a stream of extracted members.
+    for name, content_stream in extracted_files_stream:
+        if name.lower().endswith(".csv"):
+            yield name, content_stream
+```
+
+#### 4.2.3. ADLS Interaction
+
+*   The existing `prometheus/azure/blob.py` (`AzureBlobStore`) will be used.
+*   The new asset will require configuration for a target container and path prefix for the unpacked files, distinct from the "raw" location.
+
+#### 4.2.4. Dagster Resources
+
+*   Reuse `VeevaCRMVaultAdlsStorageResource` from `prometheus/veeva/resources.py`, configured via Dagster definitions to provide separate instances: one for the raw data location (using a specific `target_path_prefix`) for the upstream asset, and another for the "unpacked" data location (using a different `target_path_prefix`) for this asset. The container name and connection string for both instances are expected to be sourced from environment variables (e.g., `ADLS_CONTAINER_NAME`, `AZURE_BLOB_STORE_CONNECTION_STRING`) via Dagster resource configuration.
+
+### 4.3. Secrets Management
+
+*   No new secrets are anticipated beyond the existing `AZURE_BLOB_STORE_CONNECTION_STRING`. This must be accessed via Dagster's resource system, configured to pull from environment variables, ensuring no direct embedding of secrets in code.
+
+### 4.4. ADLS Output for Unpacked Files
+
+*   **Container**: The ADLS container is configured via the `VeevaCRMVaultAdlsStorageResource` (expected from environment variable `ADLS_CONTAINER_NAME`).
+*   **Path Prefix**: A new base prefix for unpacked files is configured via the `target_path_prefix` of the `VeevaCRMVaultAdlsStorageResource` instance provided to this asset (e.g., configured to something like `landing/internal/veeva/processed_crm_files/`). The structure under this prefix will be `[unpacked_base_prefix]/unpacked_[archive_name_without_ext]/[member_name]`.
+*   **Structure**: A centralized and deterministic path construction mechanism (`build_unpacked_blob_name()` utility) is used. For example, if the upstream archive path was `[raw_base_prefix]/249346-20250716-0000-F.tar.gz`, and the unpacked base prefix is configured as `landing/internal/veeva/processed_crm_files/`, unpacked CSVs might go to `landing/internal/veeva/processed_crm_files/unpacked_249346-20250716-0000-F/filename.csv`.
+*   **Example Full Path**: The full path will be a combination of the configured container and the path constructed by the `build_unpacked_blob_name` utility, following the structure `[ADLS_CONTAINER_NAME]/[unpacked_base_prefix]/unpacked_[archive_name_without_ext]/[member_name]`.
+
+## 5. Implementation Tasks
+
+1.  **Create `prometheus/veeva/archive.py`**:
+    *   Implement `unpack_and_stream_tar_gz_members()` function for streaming.
+    *   Implement helper `filter_csv_files_from_stream()` or similar utility.
+    *   Consider logic for extracting or generating a `metadata.json` file from the archive.
+    *   Add unit tests for these functions (e.g., using a small, sample `.tar.gz` file).
+2.  **Update/Define Dagster Resources**:
+    *   Reuse `VeevaCRMVaultAdlsStorageResource` by configuring separate instances in Dagster definitions: one for the raw location (setting its `target_path_prefix`) and another for the "unpacked" location (setting its `target_path_prefix`). Both instances will use the same container name and connection string, sourced from environment variables.
+    *   Ensure Dagster definitions (`prometheus/veeva/definitions.py`) instantiate these resources with correct configurations, ensuring container name and secrets are loaded via `env:` indirection.
+3.  **Implement `veeva_crm_vault_unpacked_files_to_adls` Asset in `prometheus/veeva/assets.py`**:
+    *   Define the asset with a dependency on the upstream `veeva_crm_vault_raw_full_export_to_adls` asset.
+    *   Implement logic to download the archive from ADLS using `AzureBlobStore` (or handle its stream).
+    *   Call `unpack_and_stream_tar_gz_members` to get extracted file contents as streams.
+    *   Implement logic to iterate through extracted file streams, construct target ADLS paths using a centralized path-building function, and upload them using `AzureBlobStore.upload_file(..., overwrite=False)` for idempotency.
+    *   Implement robust temporary file handling (e.g., using `tempfile.TemporaryDirectory` with `try/finally`) if local disk spill is necessary for any part of the process.
+    *   Add appropriate logging using a structured format (e.g., JSON).
+4.  **Configuration**:
+    *   Update Dagster definitions (`prometheus/veeva/definitions.py`) to include the new asset and configure its resource, providing the `VeevaCRMVaultAdlsStorageResource` instance configured for the unpacked location. Ensure the upstream asset also receives a `VeevaCRMVaultAdlsStorageResource` instance configured for the raw location.
+    *   Ensure environment variables for ADLS connection string and container name are available and referenced correctly in resource definitions.
+5.  **Testing**:
+    *   Unit tests for `archive.py` (already mentioned, include testing the sample archive).
+    *   Test the Dagster asset:
+        *   Locally: Mock ADLS interactions and provide a sample `.tar.gz` file to test the unpacking, streaming, and file handling logic. Include testing a dry-run mode (e.g., using an environment flag) that logs intended uploads without actual writing.
+        *   End-to-end: Trigger the upstream asset to produce a `.tar.gz` in the raw ADLS location, then trigger the new unpacking asset to process it. Verify files appear correctly in the configured "unpacked" ADLS location, following the `[unpacked_base_prefix]/unpacked_[archive_name]/` structure within the configured container.
+6.  **Documentation**:
+    *   Add docstrings to all new Python code in `archive.py` and the new asset in `assets.py`.
+    *   Update this PRD as needed.
+    *   Run `tree` command to update `docs/repository_structure.md`.
+
+## 6. Success Criteria
+
+*   The new Dagster asset `veeva_crm_vault_unpacked_files_to_adls` successfully executes.
+*   The asset correctly identifies and downloads/streams the `.tar.gz` archive produced by its upstream dependency from the raw ADLS location (configured via resource `target_path_prefix`).
+*   The asset successfully unpacks the `.tar.gz` archive, utilizing streaming for large member files to manage memory.
+*   Constituent files (especially CSVs) from the archive are uploaded to the configured "unpacked" location in ADLS, following the `[unpacked_base_prefix]/unpacked_[archive_name_without_ext]/[member_name]` structure within the configured container, with idempotent behavior (e.g., not re-uploading if the file already exists and is identical).
+*   The ADLS paths of the unpacked files are logged (using a consistent, structured format) and available as Dagster `Output` metadata.
+*   Basic error conditions (e.g., archive not found, corrupted archive, ADLS upload failure for unpacked files) are handled gracefully with appropriate retries where applicable.
+*   Code is organized into the specified modules, with new logic in `prometheus/veeva/archive.py` and `prometheus/veeva/assets.py`, utilizing the `build_unpacked_blob_name` utility.
+*   If temporary local disk usage is employed, it is managed hygienically (e.g., via `tempfile.TemporaryDirectory`).
+*   Path naming for unpacked files is deterministic and follows the centralized utility function convention (`[unpacked_base_prefix]/unpacked_[archive_name_without_ext]/[member_name]`).
+*   Secrets (connection string) and configuration (container name, path prefixes) are managed securely via Dagster resources and environment variables.
+
+## 7. Key Dependencies & Assumptions
+
+*   **Input Archive Format**: Input files from Veeva via Phase 1 asset are `.tar.gz` archives, located in ADLS at a path configured via the raw export resource's `target_path_prefix`. The Linear task's mention of "ZIP" is interpreted as a general term for "archive" in this context.
+*   **ADLS Access**:
+    *   Valid ADLS connection string (expected from environment variable `AZURE_BLOB_STORE_CONNECTION_STRING`) and container name (expected from environment variable `ADLS_CONTAINER_NAME`) are available and configured in Dagster resources.
+    *   The asset has permissions to read from the raw ADLS location and write to the configured "unpacked" ADLS location.
+*   **Upstream Asset**: The `veeva_crm_vault_raw_full_export_to_adls` asset (Phase 1) functions correctly and produces `.tar.gz` files in the specified raw ADLS location. Its output metadata should ideally provide the full path to the archive within the container.
+*   **Existing Code**: `prometheus/azure/blob.py` (`AzureBlobStore`) is functional.
+*   **File Sizes**: While individual files within the archive can be large and will be streamed, the overall archive metadata and number of files are assumed to be manageable for in-memory processing during the listing of members. The streaming approach for member content mitigates memory issues with large individual files.
+*   **Content of Archives**: Archives primarily contain CSV files that are the main target for extraction. Other file types may be present but might be ignored unless a `metadata.json` or similar is identified.
+*   **Logging Strategy**: A structured logging format (e.g., JSON) will be implemented.
+*   **Resource Configuration**: Separate instances of `VeevaCRMVaultAdlsStorageResource` are configured in Dagster definitions for the raw source path and the unpacked destination path, both using the same container name sourced from an environment variable.
+
+## 8. Future Considerations (Post-MVP)
+
+*   **Advanced Cleanup & Validation**: Implement more sophisticated data cleaning, validation (e.g., using `pandera` or `great-expectations`), and type casting for extracted CSVs.
+*   **Schema Management**: Integrate schema detection or enforcement for extracted files.
+*   **Selective Unpacking**: If needed, add logic to only unpack specific files from an archive based on a manifest or configuration.
+*   **Full Streaming Optimization**: While member streaming is in MVP, further optimize for scenarios with extremely large numbers of small files or specific archive structures if performance bottlenecks arise.
+*   **Support for other Archive Types**: If Veeva can produce other archive types (e.g., actual `.zip` files, multi-volume archives), add support for them.
+*   **Error File Handling**: Implement more robust handling for corrupted archives or problematic individual files within an archive (e.g., moving them to an error location).
+*   **Parallel Processing**: If unpacking many small files, or if multiple archives are processed in batch, consider parallelizing uploads.
+*   **Advanced Observability**: Integrate with advanced monitoring and alerting systems (e.g., PagerDuty, Azure Monitor) beyond basic Dagster logs.
+*   **Resource Configuration Documentation**: Clearly document in `prometheus/veeva/definitions.py` or a related configuration guide how the `VeevaCRMVaultAdlsStorageResource` should be configured with different target path prefixes for the raw export asset and the unpacking asset, noting that container and connection string come from environment variables.
+
+Deferred items identified in the review (previously "Orange Flags") are captured in Section 8: "Future Considerations (Post-MVP)" or noted in a separate backlog if more extensive. The proposed 48-hour task sequencing has informed the updated "Implementation Tasks" in Section 5.
+
+The core focus remains: **locate archive (under raw path) → unpack (with streaming) → stream-upload (idempotently to unpacked path structure) → emit metadata.**
+
+## 9. Documentation Requirements
+
+*   **Code Documentation**: All new Python classes, methods, and functions in `prometheus/veeva/archive.py` and the new asset in `prometheus/veeva/assets.py` will have clear docstrings (NumPy style).
+*   **PRD Updates**: This PRD will be updated if significant deviations or clarifications arise.
+*   **Repository Structure**: After new files/directories are created/modified, `docs/repository_structure.md` will be updated by running the command from the `general/tree` rule.
+*   **Commit Messages**: Descriptive commit messages referencing this PRD (e.g., "feat(veeva): Implement archive unpacking asset for PRD_018_Phase2").
+*   **AI-Friendly Annotations**: Use `# AI_DOC:`, `# AI_NOTE:`, etc., as appropriate.
+*   **Resource Configuration Documentation**: Clearly document in `prometheus/veeva/definitions.py` or a related configuration guide how the `VeevaCRMVaultAdlsStorageResource` should be configured with different target path prefixes for the raw export asset and the unpacking asset, noting that container and connection string come from environment variables.

@@ -1,0 +1,43 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# Linear Concepts & Jira Mappings
+
+This rule provides quick reference for Linear-specific concepts and how they map to Jira equivalents. Use this when discussing or editing the [Linear Guide](mdc:Linear Guide).
+
+## Core Linear Concepts
+
+| Linear Concept | Description | Jira Equivalent |
+|----------------|-------------|-----------------|
+| Team | Group of people working together, with their own workflow states | Jira Project |
+| Cycle | Time-boxed work period that auto-rolls (typically 1-2 weeks) | Sprint |
+| Project | Long-term initiative grouping related issues | Epic |
+| Issue | Unit of work; the basic task | Story/Task/Bug |
+| Sub-Issue | Smaller part of an issue | Sub-task |
+| View | Saved filter or search | Board/Filter |
+| Label | Tag for categorizing issues | Label |
+| Integration | Connection to external tools like GitHub | App/Integration |
+| API/Webhook | Programmatic access for automation | Webhooks/API |
+
+## Linear Method Principles
+1. Set Direction (clear goals using Projects)
+2. Build Momentum (ship regularly within Cycles)
+3. Write Issues, Not Stories (focused, clear tasks)
+4. Maintain Quality (detailed specs, collaboration)
+
+## Key Differences to Highlight
+- Linear emphasizes speed and keyboard-first interaction
+- Linear has fewer configuration options but sensible defaults
+- Linear's Git integration is more seamless than Jira's
+- Cycles auto-roll; unfinished issues move forward automatically
+- Linear has a cleaner, more focused UI with less administrative overhead
+
+## Common Workflows to Document
+- Creating and updating issues
+- Managing work in cycles
+- Using GitHub/GitLab integration
+- Setting up views and saved filters
+- Using keyboard shortcuts for efficiency
+- Communicating with team members via comments and mentions

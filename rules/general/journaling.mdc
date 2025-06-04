@@ -1,0 +1,75 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# Journaling Best Practices
+
+This rule provides guidelines for maintaining project journals effectively, complementing the core journaling rule.
+
+## One-Liner Command Pattern
+
+The recommended pattern for journal updates is a one-liner that handles both the date retrieval and entry appending:
+
+```bash
+DATE=$(date +%F) && echo "\n- YOUR_ENTRY_TEXT" >> .dev/journal/$DATE.md
+```
+
+## Journal Entry Formatting
+
+### Keys to Good Formatting
+
+1. **Always start with a newline**: Including `\n` at the beginning ensures proper Markdown list formatting regardless of previous content.
+2. **Use bullet points**: Start each entry with `- ` for consistent Markdown list structure.
+3. **Include date variable**: Use `$DATE` to dynamically reference the current date.
+
+### Content Guidelines
+
+- **Be concise but informative**: Briefly describe what was done, learned or modified. Use keywords to indicate what kind of note it is. Are you noting a change, a new thing, a learning, etc. Feel free to be creative and come up with new keywords.
+- **Mention specific files**: Include file paths of changed files.
+- **Note decisions**: Record important decisions and their rationales.
+
+## Common Issues & Solutions
+
+### Sublist Nesting Problem
+
+**Issue**: Without a leading newline, entries may accidentally become nested sub-items in Markdown.
+
+**Example of problem**:
+```markdown
+* File A (Updated)- Added new function
+```
+
+**Correct format with newline**:
+```markdown
+* File A (Updated)
+
+- Added new function
+```
+
+### Journal Directory Structure
+
+The journal should be organized by date in the `.dev/journal/` directory:
+
+```
+.dev/journal/
+  ├── 2023-01-01.md
+  ├── 2023-01-02.md
+  └── ...
+```
+
+## Integration with Development Workflow
+
+- Create journal entries after significant code changes
+- Review journal entries before starting new work sessions
+- Use journal content when writing commit messages or changelogs
+
+## Examples
+
+### Good Journal Entry Examples
+
+```
+- Updated authentication logic in auth.js to handle token expiration gracefully
+- Fixed CSS layout issues in dashboard component affecting mobile views
+- Researched GraphQL pagination approaches and decided on cursor-based implementation
+```

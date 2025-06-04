@@ -1,0 +1,603 @@
+# Progress Report: PRJ_018 - Veeva CRM API to ADLS Raw Ingest (Fast MVP)
+
+**Project ID:** PRJ_018
+**Report Date:** 2025-05-13
+**Report Version:** 4
+**Relevant PRD:** @PRD_018_Phase1_fast_MVP.md
+
+## Executive Snapshot
+
+**Objective:** Build an asynchronous MVP that pulls full Direct Data exports from Veeva CRM Vault and lands them in ADLS Raw.
+
+| Item | Current |
+|------|---------|
+| Overall Progress | **≈95%** (Fast‑MVP phase - MVP E2E Test Complete) |
+| Next Milestone | Deploy to Staging & Production Monitoring Setup<br/>**ETA 2025‑05‑20** |
+| Top Risk | Mock‑brittleness slowing CI pipelines (see Risk R‑002) |
+
+## 1. Implementation Status
+## Risk & Mitigation Log
+
+| ID | Risk Description | Likelihood | Impact | Mitigation / Contingency | Owner |
+|----|------------------|------------|--------|--------------------------|-------|
+| R‑001 | Veeva API rate‑limits throttle large back‑fills | Medium | High | Batch requests; exponential back‑off; coordinate window with business | Mike |
+| R‑002 | Unit‑test mocks become brittle, blocking CI | High | Medium | Keep "Mocking Cheat‑Sheet" up‑to‑date; nightly contract test against sandbox Vault | Mike |
+| R‑003 | ADLS role mis‑configuration prevents upload in prod | Low | High | Dry‑run Terraform in staging; add health‑check asset that writes a 0‑byte file | Platform Ops |
+
+## Open Questions / Blockers
+
+1. **Veeva session TTL** – how long is a session valid? Needed to decide whether `VeevaClient` should auto‑refresh.
+2. **Export retention policy** – how many days are files available for download after generation?
+3. **Incremental vs. full extract** – confirm long‑term requirement: do we move to delta exports post‑MVP?
+4. **Production ADLS container name & path conventions** – awaiting data‑platform sign‑off.
+5. **Alerting/Observability** – which channel/page duty group gets the "export failed" ping?
+
+### Phase 1: Fast MVP (Veeva Direct Data API to ADLS Raw Ingest)
+
+**Phase Summary:**
+This phase focuses on rapidly building an MVP to extract raw, full, single-part `.tar.gz` data export files from the Veeva Direct Data API and upload them to Azure Data Lake Storage (ADLS).
+
+**Tasks:**
+
+1.  **Task:** Setup directory structure and initial files for `prometheus/veeva/`
+    *   **Status:** Completed
+    *   **Date Started:** 2025-05-13
+    *   **Date Completed:** 2025-05-13
+    *   **Notes:** Created `__init__.py`, `api.py`, `resources.py`, `assets.py` within `prometheus/veeva/` with initial module docstrings and imports. Corrected initial understanding of nested `prometheus` project structure.
+
+2.  **Task:** Implement `prometheus/veeva/api.py`
+    *   **Sub-Task:** Implement `get_veeva_session()` async function
+        *   **Status:** Completed
+        *   **Date Started:** 2025-05-13
+        *   **Date Completed:** 2025-05-13
+        *   **Notes:** Function handles Veeva API authentication using `httpx`, returns `session_id`. Includes type hints, docstrings, and basic error handling (`raise_for_status`, checks for `responseStatus` and `sessionId`).
+    *   **Sub-Task:** Implement `VeevaClient` class (with `list_full_export_files` and `download_export_file` methods)
+        *   **Status:** Completed
+        *   **Date Started:** 2025-05-13
+        *   **Date Completed:** 2025-05-13
+        *   **Notes:** Implemented `VeevaClient` with methods `list_full_export_files` and `download_export_file`.
+            Refined implementation based on a working bash script provided by the user:
+            - Default API version for data services set to `v25.1`.
+            - `list_full_export_files` now uses default `start_time` and `stop_time` for `full_directdata` exports.
+            - File list parsing now expects data under the `"data"` key.
+            - Download URL is extracted from `filepart_details[0].url`.
+            - Method returns a dictionary with `original_filename`, `file_download_url`, and `full_metadata` for the first suitable single-part file.
+            - Added relevant `TODO` comments for logging, API parameter confirmation, and post-MVP enhancements.
+            - `response.json()` calls updated to be `await response.json()` based on `httpx.AsyncClient` behavior.
+
+3.  **Task:** Implement `prometheus/veeva/resources.py` (Dagster resources: `VeevaCRMVaultAPIResource`, `AdlsRawStorageResource`)
+    *   **Status:** Completed
+    *   **Date Started:** 2025-05-13
+    *   **Date Completed:** 2025-05-13
+    *   **Notes:**
+        *   Created `prometheus/veeva/resources.py`.
+        *   Implemented `VeevaCRMVaultAPIResource(ConfigurableResource)`:
+            *   Manages Veeva credentials (`vault_domain`, `vault_username`, `vault_password`) and API versions (`auth_api_version`, `data_api_version`).
+            *   Its `get_client()` method is an `@asynccontextmanager` that provides a `VeevaClient` instance.
+            *   The `VeevaClient` is configured with a managed `httpx.AsyncClient` (its lifecycle handled by the context manager) and an authenticated session ID.
+            *   Session ID is fetched using `get_veeva_session` from `api.py`.
+        *   Implemented `AdlsRawStorageResource(ConfigurableResource)`:
+            *   Manages ADLS connection details (`azure_connection_string`, `container_name`, `target_path_prefix`).
+            *   Its `get_store()` method provides an initialized `AzureBlobStore` instance.
+        *   Updated `VeevaClient` in `api.py` to accept and store an `httpx.AsyncClient` in its constructor, which is then used by its methods.
+
+4.  **Task:** Implement `prometheus/veeva/assets.py` (Dagster asset: `veeva_crm_vault_raw_full_export_to_adls`)
+    *   **Status:** Completed
+    *   **Date Started:** 2025-05-13
+    *   **Date Completed:** 2025-05-13
+    *   **Notes:**
+        *   Created `prometheus/veeva/assets.py`.
+        *   Implemented the asynchronous Dagster asset `veeva_crm_vault_raw_full_export_to_adls`.
+        *   The asset uses `VeevaCRMVaultAPIResource` to get a `VeevaClient` and interact with the Veeva API.
+        *   It lists files, selects the first suitable single-part full export (MVP logic), and downloads it into an in-memory `io.BytesIO` buffer.
+        *   It uses `AdlsRawStorageResource` to get an `AzureBlobStore` client and uploads the buffer to ADLS.
+        *   Includes logging via `context.log` for key steps and basic error handling (raises `RuntimeError` on failure).
+        *   Yields a Dagster `Output` with metadata about the uploaded file (ADLS path, source filename, size, etc.).
+        *   Added `TODO` comments for potential post-MVP enhancements (e.g., partitioning, `compute_kind`, richer `AssetMaterialization`).
+
+5.  **Task:** Configure `.env` and Dagster definitions
+    *   **Status:** Completed
+    *   **Date Started:** 2025-05-13
+    *   **Date Completed:** 2025-05-13
+    *   **Notes:**
+        *   Created `prometheus/veeva/definitions.py` to define the `veeva_crm_vault_raw_full_export_to_adls` asset and its required resources (`VeevaCRMVaultAPIResource`, `AdlsRawStorageResource`).
+        *   Resources are configured using `EnvVar` to load credentials and parameters from environment variables (expected in `.env`).
+        *   Updated root `prometheus/definitions.py` to merge the new Veeva definitions from `prometheus.veeva.definitions`.
+        *   Removed an old `veeva_ingest_job` reference from the root definitions file.
+        *   Ensured correct resource class (`VeevaCRMVaultAPIResource`) is used.
+        *   Next step is to ensure `.env` file is correctly populated with `VAULT_DOMAIN`, `VAULT_USERNAME`, `VAULT_PASSWORD`, and `AZURE_BLOB_STORE_CONNECTION_STRING`.
+
+6.  **Task:** Refactor Naming for Clarity (Veeva CRM Vault)
+    *   **Status:** Completed
+    *   **Date Started:** 2025-05-13
+    *   **Date Completed:** 2025-05-13
+    *   **Notes:** To distinguish from other Veeva sources (Network, OpenData), relevant components for the Veeva CRM Vault Direct Data API integration were renamed:
+        *   Dagster Asset (`assets.py`): `veeva_raw_full_export_to_adls` -> `veeva_crm_vault_raw_full_export_to_adls`
+        *   Asset Group Name (`assets.py`): `veeva_extraction` -> `veeva_crm_vault_extraction`
+        *   Dagster Resource Class (`resources.py`): `VeevaAPIResource` -> `VeevaCRMVaultAPIResource`
+        *   Resource Key in Definitions (`definitions.py`): `veeva_api` -> `veeva_crm_vault_api`
+        *   This renaming was applied across `assets.py`, `resources.py`, and `definitions.py` in the `prometheus/veeva/` directory.
+
+7.  **Task:** Testing
+    *   **Sub-Task:** Unit tests for `prometheus/veeva/api.py`
+        *   **Status:** Completed
+        *   **Date Started:** 2025-05-14
+        *   **Date Completed:** 2025-05-17
+        *   **Notes:** All tests in `tests/veeva/test_api.py` are now passing after resolving complex issues with `httpx.AsyncClient` mocking, specifically around synchronous vs. asynchronous method calls (`response.json()`, `response.raise_for_status()`) and async context manager behavior for `client.stream()`. Learnings extensively documented in Appendix 7.1.
+    *   **Sub-Task:** Local ADLS upload test
+        *   **Status:** Completed
+        *   **Date Started:** 2025-05-17
+        *   **Date Completed:** 2025-05-17
+        *   **Notes:** Created `tests/veeva/test_adls_upload.py` with unit tests for `AdlsRawStorageResource` and direct `AzureBlobStore` upload functionality. Initial tests highlighted issues with Dagster's `ConfigurableResource` and Pydantic's `SecretStr`. Resolved by creating mock resource classes for testing. All tests passing. Learnings documented in Appendix 7.2.
+    *   **Sub-Task:** End-to-end Dagster asset test
+        *   **Status:** Completed
+        *   **Date Started:** 2025-05-17
+        *   **Date Completed:** 2025-05-18
+        *   **Notes:** Dagster asset `veeva_crm_vault_raw_full_export_to_adls` successfully materialized, transferring a file from Veeva to ADLS. Resolved `TypeError` in `adls_store.upload_file` call by correcting keyword arguments.
+    *   **Notes:** -
+
+8.  **Task:** Documentation
+    *   **Sub-Task:** Docstrings for all new code (modules, classes, functions)
+        *   **Status:** In Progress 
+        *   **Date Started:** 2025-05-13
+        *   **Date Completed:** -
+        *   **Notes:** Module and function docstrings added for `api.py`, `resources.py`, `assets.py`, and test files (`test_api.py`, `test_adls_upload.py`). This is an ongoing effort as code evolves and new components are added.
+    *   **Sub-Task:** PRD Updates (if any major deviations)
+        *   **Status:** Not Started
+    *   **Sub-Task:** Update `docs/repository_structure.md`
+        *   **Status:** Not Started
+    *   **Notes:** -
+
+9.  **Task:** Develop and Debug Veeva API Connection Test Script (`scripts/test_veeva_connection.py`)
+    *   **Status:** Completed
+    *   **Date Started:** 2025-05-13
+    *   **Date Completed:** 2025-05-13
+    *   **Notes:**
+        *   Created `scripts/test_veeva_connection.py` to directly test Veeva API authentication and file listing.
+        *   The script loads credentials from `.env` and allows overrides via `argparse`.
+        *   Implemented logging and proper exit codes for script failures.
+        *   **Initial `TypeError` Resolution (Script Development):** Resolved various `TypeError`s related to incorrect parameter names or missing arguments when calling `get_veeva_session` and `VeevaClient.__init__` by aligning the test script with the actual function signatures in `prometheus/veeva/api.py`.
+        *   **Authentication Success:** Achieved successful authentication using `v24.1` for the auth API and obtained a session ID.
+        *   **File Listing Issue Resolution (`services/directdata/files` with `extract_type=full_directdata`):
+            *   Initial attempts to list files using `start_time="2000-01-01T00:00:00Z"` (with seconds) and omitting `stop_time` resulted in `{"responseStatus":"FAILURE","errors":[{"type":"INVALID_DATA","message":"Invalid data provided in the API call in parameter start_time."}]}`. This occurred with auth API v24.1 and data API v25.1.
+            *   Tried omitting `start_time` entirely (only `extract_type="full_directdata"` passed as param), which successfully listed files. This indicated the API could default correctly but was sensitive to an explicitly provided `start_time`.
+            *   **Final Fix:** Corrected the `start_time` format in `prometheus/veeva/api.py` for `full_directdata` calls to be `"2000-01-01T00:00Z"` (YYYY-MM-DDTHH:MMZ, excluding seconds). This resolved the `INVALID_DATA` error, and file listing succeeded. URL-encoded colons in the timestamp were confirmed not to be the issue.
+        *   The test script now successfully authenticates and lists files.
+
+### New Implementation/Refactor
+
+*   **Task:** Refactor Veeva resource config and documentation for Dagster compatibility
+    *   **Status:** Completed
+    *   **Date Started:** 2025-05-13
+    *   **Date Completed:** 2025-05-13
+    *   **Notes:**
+        *   Replaced all uses of Pydantic's `SecretStr` with plain `str` in `VeevaCRMVaultAPIResource` and related code.
+        *   Removed all references to `SecretStr` in code, docstrings, and comments.
+        *   Clarified in documentation that secrets are injected via environment variables using Dagster's `EnvVar` at resource instantiation, not in the resource class itself.
+        *   Updated docstrings to reflect this pattern.
+        *   Fixed type annotation for async context manager (`get_client`) to use `AsyncGenerator[VeevaClient, None]` for mypy/pyright compatibility.
+
+## 2. Error Log
+
+| Date       | Task/Context                                  | Error Description | Root Cause Analysis | Solution Implemented                                 | Prevention Notes                                     |
+|------------|-----------------------------------------------|-------------------|---------------------|------------------------------------------------------|------------------------------------------------------|
+| 2025-05-13 | File Creation                                 | Initial file creation path mismatch | Misunderstanding of nested `prometheus` directory structure in the workspace. | Clarified workspace structure and re-executed file creation with correct paths. | Confirm target paths explicitly when workspace has identically named nested directories. |
+| 2025-05-13 | `scripts/test_veeva_connection.py`            | `TypeError: get_veeva_session() got an unexpected keyword argument 'http_client'` | Test script incorrectly passed `http_client` to `get_veeva_session`. | `get_veeva_session` in `prometheus/veeva/api.py` manages its own client. Removed argument from test script call. | Verify function signatures in actual implementation vs. assumptions. |
+| 2025-05-13 | `scripts/test_veeva_connection.py`            | `TypeError: VeevaClient.__init__() got an unexpected keyword argument 'httpx_client'` | Test script used incorrect parameter name (`httpx_client` vs `http_client`) for `VeevaClient`. | `VeevaClient.__init__` in `prometheus/veeva/api.py` expects `http_client`. Corrected param name in test script. | Verify `__init__` signatures. |
+| 2025-05-13 | `scripts/test_veeva_connection.py`            | `TypeError: VeevaClient.__init__() got an unexpected keyword argument 'data_api_version'` | Test script used incorrect parameter name (`data_api_version` vs `api_version`) for `VeevaClient`. | `VeevaClient.__init__` in `prometheus/veeva/api.py` expects `api_version`. Corrected param name in test script. | Verify `__init__` signatures. |
+| 2025-05-13 | `scripts/test_veeva_connection.py`            | `TypeError: VeevaClient.__init__() missing 1 required positional argument: 'http_client'` | Test script call to `VeevaClient` was missing the required `http_client` after a previous incorrect removal. | `VeevaClient.__init__` in `prometheus/veeva/api.py` requires `http_client`. Reinstated argument in test script call. | Iteratively confirm all required `__init__` arguments. |
+| 2025-05-13 | Veeva API File Listing (`scripts/test_veeva_connection.py` & `api.py`) | `{"responseStatus":"FAILURE","errors":[{"type":"INVALID_DATA","message":"Invalid data provided in the API call in parameter start_time."}]}` | Veeva API (v25.1 for data services) rejected `start_time="2000-01-01T00:00:00Z"` (with seconds) for `extract_type=full_directdata`. `stop_time` was omitted. Auth API v24.1. | **Resolved.** Changed `start_time` in `prometheus/veeva/api.py` to `"2000-01-01T00:00Z"` (excluding seconds). File listing now succeeds with this format. Omitting `start_time` also worked but using the corrected documented value is preferred. | Veeva API can be very specific about exact timestamp formats. For full_directdata, `YYYY-MM-DDTHH:MMZ` is required if `start_time` is provided. |
+| 2025-05-14 | Unit Testing (`tests/veeva/test_api.py`)      | `AttributeError: 'coroutine' object has no attribute 'get'` on `response_json.get(...)` | Mocked `httpx.Response.json()` was not returning an awaitable, while the source code was not `await`ing it. Then, the mock was made synchronous (`MagicMock`) while the source code *still* needed to `await` it because `httpx.AsyncClient().get().json()` is async. | Corrected source code (`prometheus/veeva/api.py`) to `await response.json()`. Corrected tests to mock `response.json` as `AsyncMock(return_value=...)`. | Ensure mock behavior matches the actual library's sync/async nature for methods on objects returned by async calls. `httpx.Response.json()` from an `AsyncClient` is async. |
+| 2025-05-14 | Unit Testing (`tests/veeva/test_api.py`)      | `TypeError: 'coroutine' object does not support the asynchronous context manager protocol` for `async with client.stream(...)` | The `mock_httpx_client.stream.return_value` was not correctly configured as an async context manager whose `__aenter__` method returns the mock response content. | Refined mock setup for `client.stream()`: `mock_httpx_client.stream.return_value` set to an `AsyncMock()`; its `__aenter__` configured to return the `mock_stream_response_content` (another `AsyncMock`). | When mocking async context managers, ensure the `return_value` of the mocked method is itself an `AsyncMock` properly configured with `__aenter__` and `__aexit__`. |
+| 2025-05-13 | Dagster resource config | `DagsterInvalidPythonicConfigDefinitionError` for use of `SecretStr` in resource config fields | Dagster config system does not support Pydantic's `SecretStr` as a config type; only Python primitives are allowed. | Refactored resource config fields to use `str` instead of `SecretStr`. Updated all code and documentation accordingly. | Use only Python primitives for Dagster config fields. |
+| 2025-05-18 | Type checking async context manager | `Return type of async generator function must be compatible with "AsyncGenerator[Any, Any]"` | Type annotation for async context manager was set to the yielded type instead of `AsyncGenerator`. | Updated return type annotation to `AsyncGenerator[VeevaClient, None]` and added the necessary import. | Use `AsyncGenerator[YieldType, None]` for async context managers. |
+| 2025-05-18 | Dagster Asset E2E Test (`prometheus/veeva/assets.py`) | `TypeError: AzureBlobStore.upload_file() got an unexpected keyword argument 'source_file'` (and `blob_name`, `overwrite`) | Incorrect keyword arguments used when calling `adls_store.upload_file` in the `veeva_crm_vault_raw_full_export_to_adls` asset. | Corrected keyword arguments to `file_data` and `file_name`, and removed `overwrite` argument as it's handled internally by the `AzureBlobStore` method. Ensured result's `url` attribute is accessed correctly. | Double-check method signatures of called functions, especially for parameter names, when integrating components. |
+
+## 3. Design Decisions
+
+1.  **Decision ID:** DD_018_001
+    *   **Date:** 2025-05-13
+    *   **Context:** Selecting an HTTP client for Veeva API interactions within `prometheus/veeva/api.py`.
+    *   **Options Considered:**
+        1.  `requests` library (synchronous, would require an async wrapper or running in a thread pool for Dagster async assets).
+        2.  `aiohttp` (asynchronous, mature).
+        3.  `httpx` (asynchronous, modern, supports both async and sync paradigms).
+    *   **Decision:** Use `httpx`.
+    *   **Rationale:**
+        *   Native asynchronous support is crucial for integration with Dagster's asynchronous assets and for non-blocking I/O.
+        *   `httpx` provides a modern API and is recommended for new async projects.
+        *   Aligns with the `AzureBlobStorage` client which also supports async operations.
+        *   Simplifies development by using a single library that can be used synchronously if needed elsewhere, though async is the primary use case here.
+    *   **Implications:** Adds `httpx` as a project dependency. Code will use `async/await` syntax.
+    *   **Participants:** AI Assistant, User (implicitly via PRD which specified `httpx`).
+
+2.  **Decision ID:** DD_018_002
+    *   **Date:** 2025-05-13
+    *   **Context:** Module structure for Veeva integration code within the `prometheus` package.
+    *   **Options Considered:**
+        1.  Single large file for all Veeva related code.
+        2.  Separate files for API client, Dagster resources, and Dagster assets.
+    *   **Decision:** Create separate files: `prometheus/veeva/api.py`, `prometheus/veeva/resources.py`, `prometheus/veeva/assets.py`.
+    *   **Rationale:**
+        *   Follows separation of concerns, making the codebase more modular and maintainable.
+        *   Aligns with common patterns in Dagster projects.
+        *   Clearly defined in PRD_018_Phase1_fast_MVP.
+    *   **Implications:** Requires careful import management between these modules.
+    *   **Participants:** AI Assistant, User (via PRD).
+
+## 4. Technical Insights
+
+*   **Date:** 2025-05-13
+    *   **Insight:** Veeva API Authentication Details
+        *   The Veeva Direct Data API authentication (`/api/{api_version}/auth`) is a POST request.
+        *   It requires `username` and `password` as form data.
+        *   Successful authentication returns a JSON response with `responseStatus: "SUCCESS"` and a `sessionId`. This `sessionId` is crucial for subsequent API calls.
+        *   It's important to check `responseStatus` as a successful HTTP status (e.g., 200) doesn't solely guarantee a usable session.
+    *   **Tooling:** `httpx.AsyncClient` is effective for making these asynchronous calls. The `response.raise_for_status()` method is useful for catching HTTP-level errors directly.
+    *   **Error Handling:** For `get_veeva_session`, explicitly checking for `sessionId` in the response payload after a "SUCCESS" `responseStatus` adds a layer of robustness.
+    *   **Dependencies:** `httpx` for API calls.
+
+*   **Date:** 2025-05-13
+    *   **Insight:** Workspace Structure Awareness
+        *   The current workspace involves a top-level `prometheus` directory (the git repository root) and a nested `prometheus` directory (the main Python package). This requires careful path specification for file operations to target the correct location (e.g., `prometheus/veeva/api.py` refers to the inner package).
+
+*   **Date:** 2025-05-13
+    *   **Insight:** Veeva API Client Refinements from Script
+        *   A working bash script provided key details for aligning the Python `VeevaClient`:
+            *   The `/services/directdata/files` endpoint functions correctly with API version `v25.1`.
+            *   For `full_directdata` extracts, `start_time="2000-01-01T00:00:00Z"` and `stop_time` (current UTC) are effective parameters.
+            *   The API response for file listings places the array of file objects under the `"data"` key.
+            *   For single-part files, the direct download URL is found in `file_info.filepart_details[0].url`.
+            *   The primary filename for the tarball is in `file_info.filename`.
+        *   These specifics were incorporated into `prometheus/veeva/api.py` to improve its reliability for the MVP.
+    *   **Tooling:** `httpx.AsyncClient` remains suitable. `datetime` module used for `stop_time` generation.
+    *   **Dependencies:** `httpx`.
+
+## 5. Plan Deviations
+
+*   **Date:** 2025-05-13
+    *   **Deviation:** Minor initial confusion regarding the exact file paths for newly created `api.py`, `resources.py`, and `assets.py` due to the nested `prometheus` directory structure.
+    *   **Original Plan:** Files to be created directly in `prometheus/veeva/`.
+    *   **Actual Implementation:** Initially, there might have been ambiguity if the files were being placed in the root `prometheus` or the package `prometheus`.
+    *   **Reason for Deviation:** Misinterpretation of the project layout by the AI, which was then clarified by the user.
+    *   **Impact:** Minimal, quickly rectified. Files are now correctly located in `/Users/michaelhood/git/prometheus/prometheus/veeva/`.
+    *   **Lessons Learned:** Always confirm fully qualified paths when nested directories share common names, especially in AI-assisted development.
+
+## Lessons Learned (so far)
+
+* Mock *exactly* what the real library does—nothing more, nothing less.
+* Treat every async context manager as a first‑class citizen in tests; missing `__aenter__/__aexit__` will bite you.
+* Write the happy‑path test *first*; it forces you to understand the real‑world contract before sprinkling error cases.
+* Pair programming the first failing test uncovers misconceptions faster than any doc page.
+
+## 6. Future Improvements & Technical Debt
+
+*   **Item ID:** FI_018_001
+    *   **Type:** Enhancement
+    *   **Description:** Implement custom, more specific exception classes for Veeva API errors (e.g., `VeevaAuthenticationError`, `VeevaFileNotFoundError`) instead of relying solely on generic `httpx.HTTPStatusError` with descriptive messages or `KeyError`.
+    *   **Rationale:** Would allow for more granular error handling by calling code and improve code readability.
+    *   **Priority:** Medium (post-MVP)
+    *   **Logged By:** AI Assistant
+    *   **Date Logged:** 2025-05-13
+
+*   **Item ID:** FI_018_002
+    *   **Type:** Enhancement
+    *   **Description:** Investigate Veeva API session duration and implement session renewal logic within `VeevaClient` if sessions are found to be short-lived.
+    *   **Rationale:** To ensure long-running operations or subsequent calls using the same client instance don't fail due to expired sessions. The current `get_veeva_session` fetches a new session on each call (when used directly), but a client might hold a session.
+    *   **Priority:** Medium (post-MVP, dependent on API behavior)
+    *   **Logged By:** AI Assistant
+    *   **Date Logged:** 2025-05-13
+
+## 7. Appendix: Learnings from `httpx` and `pytest`
+
+### 7.1. Mocking `httpx.AsyncClient` Interactions
+
+Working with `httpx.AsyncClient` in `pytest` unit tests requires careful attention to how asynchronous methods and the objects they return are mocked. Our experience with `prometheus/veeva/api.py` and `tests/veeva/test_api.py` highlighted several key points:
+
+1.  **`response.json()` is Asynchronous for `AsyncClient`**:
+    *   **Learning:** When an `httpx.Response` object is obtained from an `await client.post(...)` or `await client.get(...)` call (where `client` is an `httpx.AsyncClient`), the `response.json()` method is *itself asynchronous* and must be `await`ed in the source code (e.g., `data = await response.json()`).
+    *   **Testing Implication:** In tests, however, we shouldn't use `AsyncMock` for `mock_response.json`. Instead, we should use a regular `MagicMock` and set its `return_value`: `mock_response.json.return_value = {...}`. This is because the mock is mimicking the *result* of an awaited coroutine, not the coroutine itself.
+    *   **Initial Pitfall:** We initially treated `response.json()` as synchronous in the source but used `AsyncMock` in tests, leading to `AttributeError: 'coroutine' object has no attribute 'get'`.
+
+2.  **`response.raise_for_status()` is Synchronous**:
+    *   **Learning:** Unlike `response.json()`, the `response.raise_for_status()` method on an `httpx.Response` object (even one from an `AsyncClient`) is synchronous. It either does nothing or raises an exception directly.
+    *   **Testing Implication:** The mock for this method (`mock_response.raise_for_status`) should be a standard `unittest.mock.MagicMock()`. Its `side_effect` can be set to raise an `httpx.HTTPStatusError` for testing error paths.
+
+3.  **Mocking `httpx.AsyncClient` as an Async Context Manager**:
+    *   **Learning:** When `httpx.AsyncClient` is used with `async with` as a context manager, we need to correctly mock its async context manager protocol:
+    ```python
+    # Client needs both __aenter__ and __aexit__ async methods
+    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+    mock_client.__aexit__ = AsyncMock(return_value=None)
+    ```
+    *   **Testing Implication:** Without these methods, using a mocked client with `async with` will fail with: `TypeError: object does not support the async context manager protocol`.
+
+4.  **Mocking `client.stream()` Asynchronous Context Manager**:
+    *   **Learning:** The `httpx.AsyncClient.stream()` method returns an object that is used as an asynchronous context manager using `async with client.stream(...) as response:`.
+    *   **Testing Implication:**
+        *   The `mock_client.stream` attribute should be a `MagicMock` (not an `AsyncMock`).
+        *   What `mock_client.stream()` returns (i.e., `mock_client.stream.return_value`) must be an `AsyncMock` that implements the asynchronous context manager protocol.
+        *   This means `async_context_manager.__aenter__` needs to be an `AsyncMock`. The `return_value` of `__aenter__` is what gets assigned to the `response` variable in the `async with ... as response:` block.
+        *   The yielded `response` mock (e.g., `mock_stream_response_content`) will then have its own methods mocked as needed (e.g., `aiter_bytes` as an `AsyncMock` that returns an async iterator, and `raise_for_status` as a synchronous `MagicMock`).
+    *   **Correct Setup:**
+    ```python
+    # Create async context manager that stream() will return
+    async_context_manager = AsyncMock()
+    async_context_manager.__aenter__.return_value = mock_stream_response_content
+    async_context_manager.__aexit__ = AsyncMock(return_value=None)
+    
+    # Set up the stream method to return this async context manager
+    mock_httpx_client.stream = MagicMock(return_value=async_context_manager)
+    ```
+
+5.  **Key Distinctions Between Sync and Async Methods**:
+    *   **Synchronous methods** should be mocked with `MagicMock`
+    *   **Asynchronous methods** should be mocked with `AsyncMock`
+    *   **Methods that return async context managers** (like `stream()`) should be:
+        * The method itself: `MagicMock`
+        * Its return value: `AsyncMock` with `__aenter__` and `__aexit__` properly configured
+
+### 7.2. Azure Blob Storage Testing
+
+Creating effective unit tests for Azure Blob Storage upload functionality requires understanding how to properly mock Azure's asyncio-based SDK:
+
+1. **Mock Hierarchy for Azure Blob Storage**:
+   * **Learning:** The Azure Blob Storage SDK uses a hierarchy of client objects:
+     * `BlobServiceClient` for the overall service
+     * `ContainerClient` for operations on containers
+     * `BlobClient` for operations on blobs
+   * **Testing approach:** Create mocks for all three client levels and set up their relationships:
+     ```python
+     # Create mock for BlobServiceClient
+     mock_service_client = MagicMock(spec=BlobServiceClient)
+     
+     # Create mock for ContainerClient
+     mock_container_client = MagicMock(spec=ContainerClient)
+     mock_service_client.get_container_client.return_value = mock_container_client
+     
+     # Create mock for BlobClient
+     mock_blob_client = MagicMock(spec=BlobClient)
+     mock_container_client.get_blob_client.return_value = mock_blob_client
+     ```
+
+2. **Async Methods in the Azure SDK**:
+   * **Learning:** Many methods in the Azure Blob Storage SDK are async and need to be mocked with `AsyncMock`.
+   * **Correct implementation:** For upload operations, use `AsyncMock` for method that return coroutines:
+     ```python
+     mock_blob_client.upload_blob = AsyncMock(return_value={"etag": "test-etag", "last_modified": "timestamp"})
+     ```
+
+3. **Client Creation with Connection Strings**:
+   * **Learning:** The `from_connection_string` factory methods in Azure SDK are async and return coroutines.
+   * **Testing approach:** To avoid complexity in tests, it's simpler to patch these factory methods and directly set client instances:
+     ```python
+     # Instead of testing the client creation:
+     monkeypatch.setattr(
+         "azure.storage.blob.aio.ContainerClient.from_connection_string",
+         AsyncMock(return_value=mock_container_client)
+     )
+     ```
+
+4. **Simplifying Tests with Property Access**:
+   * **Learning:** Using properties to dynamically access clients in your wrapper classes can make testing easier.
+   * **Testing approach:** Create a property to get the container client only when needed, which helps track method calls for assertions:
+     ```python
+     @property
+     def container_client(self):
+         if self._container_client is None:
+             self._container_client = self.blob_service_client.get_container_client(self.container_name)
+         return self._container_client
+     ```
+
+5. **Testing File Upload with BytesIO**:
+   * **Learning:** For testing file uploads, use `io.BytesIO` to create in-memory file-like objects.
+   * **Testing approach:** Create test content and wrap in BytesIO for realistic upload tests:
+     ```python
+     test_content = b"Test file content"
+     file_buffer = io.BytesIO(test_content)
+     
+     # Upload and assert
+     upload_result = await store.upload_file(file_data=file_buffer, file_name="test-file.txt")
+     ```
+
+These learnings were incorporated into comprehensive tests for the ADLS integration layer, ensuring that the file upload functionality works correctly and reliably.
+
+### 7.3. General `pytest` and `unittest.mock` with `asyncio`
+
+*   **`@pytest.mark.asyncio`**: Essential for decorating async test functions.
+*   **`pytest-asyncio` Fixtures**: Provides infrastructure for async testing, including event loop management.
+*   **Mocking Response Objects**: Create a mock with `MagicMock(spec=httpx.Response)` and configure its methods appropriate to their sync/async nature.
+*   **Simulating Async Iterators**: For methods like `aiter_bytes()` that return async iterators, define custom async generator functions:
+    ```python
+    async def mock_aiter_bytes(*args, **kwargs):
+        yield b"Test file content"
+    
+    mock_stream_response_content.aiter_bytes = mock_aiter_bytes
+    ```
+
+### 7.4. Correct Mental Model for httpx
+
+When working with httpx, it's important to understand which parts are synchronous vs. asynchronous:
+
+1. **AsyncClient Methods** (`get()`, `post()`, etc.) - **Asynchronous**
+   * Must be awaited: `response = await client.get(...)`
+
+2. **Response Methods** - **Mixed**:
+   * `json()` - **Asynchronous** (must be awaited)
+   * `raise_for_status()` - **Synchronous** (direct call)
+   * `text()` - **Asynchronous**
+
+3. **AsyncClient Context Manager** - **Asynchronous**
+   * Used with: `async with httpx.AsyncClient() as client:`
+
+4. **Stream Context Manager** - **Asynchronous**
+   * Used with: `async with client.stream(...) as response:`
+   * Returns a response that provides async iteration: `async for chunk in response.aiter_bytes()`
+
+These distinctions are crucial for correctly implementing both the production code and tests. The most common pitfalls involve:
+
+1. Not awaiting async methods in production code
+2. Using the wrong type of mock (AsyncMock vs. MagicMock) in tests
+3. Incorrectly setting up mock context managers
+
+When in doubt, prioritize making your tests match the real behavior of the library as closely as possible, rather than trying to modify the production code to accommodate test behavior.
+
+These learnings are particularly valuable as we develop more async-based services in the Prometheus stack, where proper testing of async code is essential for reliability.
+
+### 7.5 Mocking Patterns Cheat‑Sheet
+
+| Real‑world construct | Sync/Async? | Mock object to use | Notes |
+|----------------------|-------------|--------------------|-------|
+| `AsyncClient.post/get` | **Async** | `AsyncMock()` | `await client.post(...)` |
+| `Response.json()` (from AsyncClient) | **Async** | `MagicMock()` with `return_value` | *Do not* use `AsyncMock` – you're mocking the *result* of `await response.json()` |
+| `Response.raise_for_status()` | **Sync** | `MagicMock()` | Set `side_effect` to raise for negative tests |
+| `AsyncClient.stream()` | **Sync** (returns async‑ctx‑mgr) | `MagicMock()` | Its `return_value` → `AsyncMock()` with `__aenter__/__aexit__` |
+| `response.aiter_bytes()` | **Async iter** | custom async generator | Yield chunks in tests |
+
+### 7.6 Failure Taxonomy
+
+| Failure Signature (pytest output) | Likely Root Cause | One‑liner Fix |
+|----------------------------------|-------------------|---------------|
+| `'coroutine' object has no attribute 'get'` | Forgot to await `response.json()` *or* mocked it with `AsyncMock` | Change source to `await`, mock with `MagicMock(return_value=...)` |
+| `'coroutine' object does not support the asynchronous context manager protocol` | `.stream()` mock non‑compliant | Return an `AsyncMock` that implements `__aenter__/__aexit__` |
+| `raise_for_status` never called | Mocked with `AsyncMock`; test waiting on call count | Use plain `MagicMock()`; ensure business logic path invokes it |
+| CI hangs on Windows | Event loop policy mismatch in `pytest-asyncio` | Set `asyncio_mode=strict` and explicitly scope event loop fixtures |
+
+### 7.7 Parameterized Testing Best Practices
+
+The project's test suite was improved by applying parameterized testing techniques to the Veeva API authentication tests. This refactoring provided several benefits:
+
+1. **Consolidated Multiple Test Cases**: Converted 4 separate test functions into a single parameterized test, reducing code duplication while maintaining complete test coverage.
+
+2. **Improved Test Structure and Readability**: 
+   * Created a helper function `auth_test_case()` to define test parameters with meaningful defaults
+   * Used keyword arguments for clarity in test case definitions
+   * Added explicit `ids` to make test output more readable
+
+3. **Enhanced Error Coverage**: 
+   * Included explicit test cases for HTTP errors by parameterizing the `raise_for_status_error`
+   * Added test cases for edge conditions like empty JSON and unexpected API response structures
+   * Ensured assertions work properly across all scenarios
+
+4. **Improved Call Argument Assertions**:
+   * Used named attributes (`call_args.args` and `call_args.kwargs`) instead of positional indexing
+   * Made assertions more explicit and readable
+
+**Example of the improved test data structure**:
+
+```python
+# Helper function to define test cases with sensible defaults
+def auth_test_case(
+    json_payload=None,
+    raises_exception=True,
+    expected_error_type=httpx.HTTPStatusError,
+    expected_error_message_match="",
+    expected_session_id=None,
+    raise_for_status_error=None
+):
+    """Create a test case tuple with sensible defaults for authentication tests."""
+    return (
+        json_payload,
+        raises_exception,
+        expected_error_type,
+        expected_error_message_match,
+        expected_session_id,
+        raise_for_status_error
+    )
+
+# Clear, concise test case definitions
+AUTH_TEST_CASES = [
+    # Happy path - successful authentication
+    auth_test_case(
+        json_payload={"responseStatus": "SUCCESS", "sessionId": MOCK_SESSION_ID},
+        raises_exception=False,
+        expected_error_type=None,
+        expected_session_id=MOCK_SESSION_ID
+    ),
+    
+    # Error case - missing session ID
+    auth_test_case(
+        json_payload={"responseStatus": "SUCCESS"},
+        expected_error_type=KeyError,
+        expected_error_message_match="Authentication successful, but 'sessionId' not found in response."
+    ),
+    # Additional test cases...
+]
+```
+
+**Key Learnings from Test Refactoring**:
+
+1. **Parameter Clarity**: Use named parameters and helper functions to make test cases self-documenting.
+
+2. **Default Values**: Establish sensible defaults to reduce repetition in test cases.
+
+3. **Proper Mock Configuration**: Configure mocks differently for different scenarios using parameterization.
+
+4. **Assertion Style**: Use named attributes rather than positional indices when asserting against complex objects.
+
+5. **Test IDs**: Always provide meaningful `ids` for parameterized tests to make test output and failures easier to interpret.
+
+These patterns have been applied to the Veeva API test suite and can be used as a template for future test refactoring across the Prometheus codebase.
+
+### 7.8. Dagster Config, Secrets, and Typing Learnings (2025-05-18)
+
+1. **Dagster config fields must be Python primitives**
+    * Dagster's config system only supports primitive types (`str`, `int`, `float`, `bool`, `list`, `dict`) for resource config fields. Pydantic's `SecretStr` is not supported and will cause a `DagsterInvalidPythonicConfigDefinitionError`.
+    * **Solution:** Use `str` for secrets in resource config fields. If masking is needed, convert to `SecretStr` at runtime, not in the config schema.
+
+2. **Pattern for using EnvVar with Dagster resources**
+    * The resource class should expect `str` fields.
+    * Use `EnvVar("MY_ENV_VAR")` at resource instantiation (e.g., in `definitions.py`) to inject secrets from the environment.
+    * Docstrings should clarify that secrets are injected via `EnvVar` at instantiation, not in the class definition.
+
+3. **Async context manager typing for mypy/pyright**
+    * For functions decorated with `@asynccontextmanager`, the return type should be `AsyncGenerator[YieldType, None]`, not just the yielded type. This avoids type checker errors.
+    * **Example:**
+      ```python
+      from collections.abc import AsyncGenerator
+      @asynccontextmanager
+      async def get_client(self) -> AsyncGenerator[VeevaClient, None]:
+          ...
+      ```
+
+4. **Updating docstrings for clarity**
+    * Docstrings for Dagster resources should explicitly state that secrets are injected via environment variables using `EnvVar` at instantiation, and that the resource class expects plain strings.
+    * This helps future maintainers understand the config pattern and avoid similar errors.
+
+## 2. Progress: Core Functionality
+
+| Area | Stage | Status | Next Steps |
+| ---- | ----- | ------ | ---------- |
+| Authentication | Testing | ✅ Complete | → API operations |
+| External API responses | Testing | ✅ Complete | → Data structures |
+| Response parsing | Testing | ✅ Complete | → Data validation |
+| Document download | Testing | ✅ Complete | → ADLS integration |
+| ADLS integration | Testing | ✅ Complete | → Data transformation |
+
+Milestones achieved:
+1. Implementation of the Veeva API authentication client
+2. Creation of robust unit tests for authentication and API interactions
+3. Implementation of document download functionality 
+4. Implementation and testing of ADLS upload functionality
+5. Development of comprehensive test suite for end-to-end verification
+
+## 3. Tasks in progress
+
+| Task ID | Description | Owner | Status | Blockers |
+| ------- | ----------- | ----- | ------ | -------- |
+| T-007 | Improve API error handling with structured responses | Mike | In review | None |
+| T-008 | Implement data transformation layer | Mike | Not started | None |
+| T-009 | Create demo script for end-to-end usage example | Mike | Not started | None |
+
+## 4. Completed tasks
+
+| Task ID | Description | Owner | Completion Date |
+| ------- | ----------- | ----- | --------------- |
+| T-001 | Set up project structure and environment | Mike | 2025-05-10 |
+| T-002 | Implement Veeva authentication module | Mike | 2025-05-12 |
+| T-003 | Build API wrapper for Veeva CRM Vault | Mike | 2025-05-14 |
+| T-004 | Implement unit tests for API interactions | Mike | 2025-05-15 |
+| T-005 | Implement document download functionality | Mike | 2025-05-16 |
+| T-006 | Implement and test ADLS upload functionality | Mike | 2025-05-17 |
+| T-010 | Refactor Veeva resource config and docstrings for Dagster compatibility | Mike | 2025-05-18 |
+| T-011 | Fix async context manager type annotation for get_client | Mike | 2025-05-18 |

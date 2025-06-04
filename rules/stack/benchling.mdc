@@ -1,0 +1,318 @@
+---
+description: Guidelines for Benchling API integration and entity management
+globs: ["**/benchling/**/*.py", "**/services/benchling*.py"]
+alwaysApply: false
+---
+# BENCHLING INTEGRATION SPECIFICS
+
+## API Usage
+- Always use the benchling-sdk package for API interactions
+    - The sdk docs are indexed should be included with relevant queries by including `@Benchling Python SDK` in the query
+- Store API credentials securely using environment variables
+- Implement proper rate limiting and error handling for API calls
+- Cache frequently accessed Benchling data when appropriate
+- Use entity IDs from the appropriate environment (dev/prod)
+
+## Entity Management
+- Follow Benchling's entity relationship model
+- Maintain consistent naming conventions across entities
+- Document schema IDs and folder IDs in resources/api_ids directory
+- Implement validation for required fields before entity creation
+
+## Benchling Data Models
+- Create proper data models for Benchling entities
+- Use type hints for all entity properties
+- Implement serialization/deserialization methods
+- Validate data before sending to Benchling API
+- Handle API version changes gracefully
+
+# Benchling SDK Integration Guidelines
+
+This rule provides guidelines for working with the Benchling Python SDK, based on lessons learned from debugging entry ID resolution and entity extraction issues.
+
+## Table of Contents
+- [ID Types and Resolution](mdc:#id-types-and-resolution)
+- [SDK Method Usage Patterns](mdc:#sdk-method-usage-patterns)
+- [Common Pitfalls and Solutions](mdc:#common-pitfalls-and-solutions)
+- [Testing Strategies](mdc:#testing-strategies)
+- [Code Examples](mdc:#code-examples)
+
+## ID Types and Resolution
+
+### Understanding Benchling ID Types
+
+Benchling uses different ID types for different purposes:
+
+- **Display IDs**: User-friendly identifiers shown in UI (e.g., `EXP24001737`, `STUDY_951`)
+- **Entry IDs**: API identifiers for entries (e.g., `etr_psLAdeRM`)
+- **Entity IDs**: API identifiers for entities (e.g., `bfi_xxxxxxxx`)
+- **Registry IDs**: For registered entities (e.g., custom entity registry IDs)
+
+### Critical Rule: Always Resolve Display IDs First
+
+When users provide experiment IDs like `EXP24001737`, these are **display IDs**, not entry IDs. You must resolve them to actual entry IDs before using most SDK methods.
+
+```python
+# ❌ WRONG - This will fail with 404
+entry = benchling.entries.get_entry_by_id("EXP24001737")
+
+# ✅ CORRECT - Resolve display ID to entry ID first
+entries = benchling.entries.bulk_get_entries(display_ids=["EXP24001737"])
+if entries:
+    entry_id = entries[0].id  # e.g., "etr_psLAdeRM"
+    entry = benchling.entries.get_entry_by_id(entry_id)
+```
+
+## SDK Method Usage Patterns
+
+### Entry Resolution (Recommended Pattern)
+
+```python
+def resolve_display_ids_to_entry_ids(benchling, display_ids: List[str]) -> Dict[str, str]:
+    """
+    Resolve display IDs to actual entry IDs.
+    
+    Returns:
+        Dictionary mapping display_id -> entry_id
+    """
+    display_to_entry_mapping = {}
+    
+    # Use bulk_get_entries - works with display IDs and returns List[Entry]
+    entries = benchling.entries.bulk_get_entries(display_ids=display_ids)
+    
+    if entries:
+        for entry in entries:
+            display_to_entry_mapping[entry.display_id] = entry.id
+    
+    return display_to_entry_mapping
+```
+
+### Preferred SDK Methods
+
+**For Entry Operations:**
+- `bulk_get_entries(display_ids=[...])` - Works with display IDs, returns `List[Entry]`
+- `get_entry_by_id(entry_id)` - Needs actual entry ID (not display ID)
+
+**For Entity Operations:**
+- `bulk_get_entities(entity_ids=[...])` - For entity IDs
+- `list_entities(registry_ids=[...])` - For registry IDs
+- Use `entity_registry_ids` parameter, not `registry_ids`
+
+### PageIterator Handling
+
+Many SDK methods return `PageIterator` objects, not regular lists:
+
+```python
+# ❌ DON'T convert PageIterator to list like this
+entries_list = list(page_iterator)  # Can cause attribute errors
+
+# ✅ DO iterate properly with limits
+entries_list = []
+for entry in page_iterator:
+    entries_list.append(entry)
+    if len(entries_list) >= 100:  # Always add reasonable limits
+        break
+```
+
+## Common Pitfalls and Solutions
+
+### 1. Wrong Parameter Names
+
+```python
+# ❌ WRONG - Parameter name is incorrect
+entities = benchling.custom_entities.list(registry_ids=[exp_id])
+
+# ✅ CORRECT - Use entity_registry_ids
+entities = benchling.custom_entities.list(entity_registry_ids=[exp_id])
+```
+
+### 2. Assuming Display IDs Work Everywhere
+
+```python
+# ❌ WRONG - Most methods don't accept display IDs
+entry = benchling.entries.get_entry_by_id("EXP24001737")
+
+# ✅ CORRECT - Resolve display ID first
+mapping = resolve_display_ids_to_entry_ids(benchling, ["EXP24001737"])
+entry_id = mapping["EXP24001737"]
+entry = benchling.entries.get_entry_by_id(entry_id)
+```
+
+### 3. Not Handling Empty Results
+
+```python
+# ❌ WRONG - No error handling
+entry = benchling.entries.bulk_get_entries(display_ids=[exp_id])[0]
+
+# ✅ CORRECT - Always check for results
+entries = benchling.entries.bulk_get_entries(display_ids=[exp_id])
+if not entries:
+    logger.error(f"No entries found for display ID: {exp_id}")
+    return None
+entry = entries[0]
+```
+
+## Testing Strategies
+
+### 1. Start Simple and Build Up
+
+Always test with the most basic case first:
+
+```python
+# Step 1: Test basic connection
+benchling = Benchling(url=url, auth_method=ApiKeyAuth(api_key))
+
+# Step 2: Test single ID resolution
+entries = benchling.entries.bulk_get_entries(display_ids=["EXP24001737"])
+print(f"Found: {entries[0].id} -> {entries[0].display_id}")
+
+# Step 3: Test direct fetch with resolved ID
+entry = benchling.entries.get_entry_by_id(entries[0].id)
+
+# Step 4: Build complex operations on top
+```
+
+### 2. Verify ID Mappings
+
+```python
+# Always log ID mappings during development
+logger.info(f"Resolved display IDs: {display_to_entry_mapping}")
+for display_id, entry_id in mapping.items():
+    logger.info(f"  {display_id} -> {entry_id}")
+```
+
+### 3. Test Script Pattern
+
+Create a simple test script to validate SDK usage:
+
+```python
+#!/usr/bin/env python3
+"""Test Benchling SDK integration."""
+
+def test_basic_resolution():
+    """Test basic display ID to entry ID resolution."""
+    benchling = get_benchling_client()
+    
+    test_ids = ["EXP24001737"]  # Start with one known ID
+    entries = benchling.entries.bulk_get_entries(display_ids=test_ids)
+    
+    assert len(entries) > 0, f"No entries found for {test_ids}"
+    
+    entry = entries[0]
+    print(f"✅ Found: {entry.display_id} -> {entry.id}")
+    
+    # Verify round-trip
+    fetched = benchling.entries.get_entry_by_id(entry.id)
+    assert fetched.display_id == entry.display_id
+    print(f"✅ Round-trip successful")
+
+if __name__ == "__main__":
+    test_basic_resolution()
+```
+
+## Code Examples
+
+### Complete Entry and Entity Extraction
+
+```python
+class BenchlingEntityExtractor:
+    def __init__(self, benchling_client):
+        self.benchling = benchling_client
+    
+    def extract_entities_for_experiments(self, experiment_display_ids: List[str]):
+        """Extract entities associated with experiment entries."""
+        
+        # Step 1: Resolve display IDs to entry IDs
+        logger.info(f"Resolving {len(experiment_display_ids)} display IDs")
+        id_mapping = self.resolve_display_ids_to_entry_ids(experiment_display_ids)
+        
+        if not id_mapping:
+            logger.error("No experiments found for provided display IDs")
+            return {}
+        
+        logger.info(f"Resolved {len(id_mapping)} experiments")
+        
+        # Step 2: Extract entities for each resolved entry
+        all_entities = {}
+        for display_id, entry_id in id_mapping.items():
+            logger.info(f"Processing {display_id} (entry_id: {entry_id})")
+            entities = self.find_entities_for_entry(entry_id)
+            all_entities[display_id] = entities
+        
+        return all_entities
+    
+    def resolve_display_ids_to_entry_ids(self, display_ids: List[str]) -> Dict[str, str]:
+        """Resolve display IDs to entry IDs."""
+        try:
+            entries = self.benchling.entries.bulk_get_entries(display_ids=display_ids)
+            return {entry.display_id: entry.id for entry in entries}
+        except Exception as e:
+            logger.error(f"Failed to resolve display IDs: {e}")
+            return {}
+    
+    def find_entities_for_entry(self, entry_id: str) -> List[Dict]:
+        """Find all entities associated with an entry."""
+        entities = []
+        
+        # Method 1: Get entry and check for entity mentions
+        try:
+            entry = self.benchling.entries.get_entry_by_id(entry_id)
+            # Process entry content for entity mentions...
+        except Exception as e:
+            logger.error(f"Failed to get entry {entry_id}: {e}")
+        
+        # Method 2: Search for entities that reference this entry
+        # (Implementation depends on your specific use case)
+        
+        return entities
+```
+
+### Configuration Helper
+
+```python
+def get_benchling_client(env: str = "prod") -> Benchling:
+    """Get configured Benchling client."""
+    
+    if env == "prod":
+        url = "https://avidity.benchling.com"
+        api_key = os.getenv("BENCHLING_PROD_API_KEY")
+    else:
+        url = "https://avidity-dev.benchling.com"
+        api_key = os.getenv("BENCHLING_DEV_API_KEY")
+    
+    if not api_key:
+        raise ValueError(f"Missing API key for {env} environment")
+    
+    return Benchling(url=url, auth_method=ApiKeyAuth(api_key))
+```
+
+## Integration with Existing Codebase
+
+When working with the existing [BenchlingGateway](mdc:src/adapters/gateway.py):
+
+- Use the established patterns for rate limiting and caching
+- Follow the existing error handling conventions
+- Add display ID resolution methods to the gateway class
+- Ensure consistency with existing entity extraction patterns in [experiment data extraction scripts](mdc:scripts/experiment_data_extraction)
+
+## Debugging Checklist
+
+When Benchling SDK calls fail:
+
+1. ✅ **Check ID Type**: Are you using display IDs where entry IDs are expected?
+2. ✅ **Check Parameter Names**: Use correct parameter names (e.g., `entity_registry_ids` not `registry_ids`)
+3. ✅ **Check Return Types**: Handle PageIterators properly
+4. ✅ **Check API Permissions**: Ensure your API key has required permissions
+5. ✅ **Check Rate Limits**: Add delays if hitting rate limits
+6. ✅ **Check SDK Version**: Ensure you're using compatible SDK version
+
+## Quick Reference
+
+| Task | Method | ID Type Required |
+|------|--------|------------------|
+| Resolve display ID | `bulk_get_entries(display_ids=[...])` | Display ID |
+| Get entry by ID | `get_entry_by_id(entry_id)` | Entry ID |
+| Get entity by ID | `get_entity_by_id(entity_id)` | Entity ID |
+| List entities | `list_entities(entity_registry_ids=[...])` | Registry ID |
+
+**Remember**: When in doubt, start with `bulk_get_entries(display_ids=[...])` to resolve user-provided IDs to the correct API IDs. 

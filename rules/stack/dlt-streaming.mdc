@@ -1,0 +1,145 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# DLT Streaming Best Practices
+
+This rule provides guidance on implementing high-performance, memory-efficient streaming data pipelines using the dlt (data loading tool) framework, with focus on handling large files and archive processing.
+
+## What "Streaming" Means in dlt
+
+Streaming in dlt follows these core principles:
+
+1. **Zero Full-File Loading**
+   - Files never sit entirely in RAM
+   - FileItem's `open()` method returns lazy fsspec file-like objects
+   - Content streams directly from source buckets
+
+2. **Generator-Based Transformers**
+   - Transformers use `yield` pattern to process data incrementally
+   - Each `yield` flushes data downstream, releasing memory
+   - Example pattern:
+   ```python
+   @dlt.transformer
+   def process_data(source):
+       for chunk in source:
+           processed = transform(chunk)
+           yield dlt.mark.with_table_name(processed, "table_name")
+   ```
+
+3. **Multi-Stage Pipeline Architecture**
+   - dlt uses three-stage engine with bounded buffers
+   - Data flows: extract → normalize → load
+   - Buffer sizes are configurable (default: 5,000 rows)
+
+4. **Automatic Back-Pressure**
+   - Each stage only consumes as fast as the next can accept
+   - If downstream systems throttle, upstream slows down
+   - Memory usage remains stable regardless of data volume
+
+## Practical Implementation Guidelines
+
+### Memory Management
+
+| Configuration | Recommendation | Notes |
+|---------------|---------------|-------|
+| Batch size | 1,000-5,000 rows | Use smaller batches (500) for wide tables |
+| Buffer size | `DATA_WRITER.buffer_max_items` | Configure for your memory constraints |
+
+### Architecture Best Practices
+
+1. **Pass File Handles, Never Load Full Content**
+   ```python
+   # ✅ DO THIS
+   with file_item.open("rb") as stream, tarfile.open(fileobj=stream, mode="r:gz") as tar:
+       # Process streaming content
+   
+   # ❌ AVOID THIS
+   content = file_item.open("rb").read()  # Loads entire file into memory
+   with tarfile.open(fileobj=io.BytesIO(content), mode="r:gz") as tar:
+       # Process content
+   ```
+
+2. **Process Files Incrementally**
+   ```python
+   # Process in small batches
+   for batch in _row_batches(source, batch_size=1000):
+       yield dlt.mark.with_table_name(batch, table_name)
+   ```
+
+3. **Build and Emit Schema First**
+   ```python
+   # Parse metadata to build schema
+   schema = _build_schema(metadata)
+   # Emit schema before any rows
+   yield dlt.mark.with_schema(schema)
+   ```
+
+4. **Mark Tables Explicitly**
+   ```python
+   # Always wrap batches with table name before yielding
+   yield dlt.mark.with_table_name(batch, table_name)
+   ```
+
+## Reference Implementation Pattern
+
+```python
+@dlt.transformer(standalone=True)
+def read_tar_gz(files, batch_size=1000):
+    for f in files:
+        with f.open("rb") as stream, tarfile.open(fileobj=stream, mode="r:gz") as tar:
+            manifest = _parse_manifest(tar)          # tiny, fits in memory
+            schema = _build_schema(tar, manifest)    # tiny
+            yield dlt.mark.with_schema(schema)       # send schema downstream
+
+            for entry in manifest:                   # loop members in order
+                for batch in _row_batches(tar, entry.path, batch_size):
+                    yield dlt.mark.with_table_name(batch, _table(entry))
+```
+
+## Performance Tuning Options
+
+| Configuration | Default | When to Change |
+|---------------|---------|----------------|
+| `batch_size` in transformer | 1000 | 5000 for narrow tables, 500 for wide tables |
+| `[extract] workers = N` in dlt.ini | 1 | Set to cores × 0.8 for parallel processing |
+| `[load] file_max_rows` | 100,000 | Lower to 20,000 for Snowflake timeouts |
+| `[load] delete_completed_jobs=true` | false | Enable in production for cleanup |
+
+## Security and Configuration
+
+1. **Configuration Management**
+   - Store credentials in `.dlt/secrets.toml` or environment variables
+   - Never hardcode credentials in Python code
+
+2. **Security Recommendations**
+   - Use managed identities where possible
+   - Create dedicated service accounts with minimal permissions
+   - Ship transformers as versioned packages to prevent drift
+
+## Common Pitfalls
+
+1. **File Access Errors**
+   - Implement proper checks for file completion before processing
+   - Use event-based triggers with stability verification
+
+2. **Duplicate Data**
+   - Always mark batches with table name before yielding
+   - Use incremental processing with proper state management
+
+3. **Schema Drift**
+   - Monitor and alert on schema changes
+   - Compare incoming metadata with existing schemas
+
+4. **Data Type Issues**
+   - Map text fields to generous string lengths (64k+) unless explicitly limited
+   - Validate field types before loading
+
+## The "Zen of dlt"
+
+1. **Everything is idempotent** - Functions can be called twice without side-effects
+2. **State is a first-class citizen** - Store derived information in pipeline state
+3. **One-way doors only** - Never mutate source data outside the merge step
+4. **Fail fast, fail loud, retry clean** - Use proper error handling
+5. **Push code to data** - Keep heavy transformations in the data warehouse

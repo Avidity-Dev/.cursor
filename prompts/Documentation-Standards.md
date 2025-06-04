@@ -1,0 +1,329 @@
+# Documentation Standards
+
+<!-- TABLE OF CONTENTS -->
+- @Executive Summary
+- @Analysis Process Before Documenting
+- @Top-Level (Module/File) Documentation
+- @Class & Method Documentation
+- @Inline Comments
+- @Variable & Function Naming
+- @API Documentation
+- @Project Documentation
+- @Specific Implementation Details
+- @Code Formatting
+- @Documentation Priority & Depth
+- @AI-Friendly Annotations
+- @Example Templates
+- @Strategic Commenting Checklist
+- @Security Documentation
+- @Review & Update Policy
+- @Tool Integration & Automation
+- @Domain Glossary Usage
+- @Documentation Tone & Style
+- @OpenAPI/Swagger Compatibility
+- @Red Flag Comments
+- @Docs-as-Pair-Programmer
+- @Navigation for Documentation Files
+
+## Executive Summary
+
+This document provides comprehensive guidelines for creating effective code documentation that serves both human developers and AI systems. Key principles include:
+
+1. **Document purpose and context** rather than just implementation details
+2. **Prioritize external interfaces** first, business logic second, and utilities last
+3. **Use consistent formats** (NumPy style for Python) across the codebase
+4. **Include AI-friendly annotations** to help with automated analysis
+5. **Document security considerations** explicitly for critical components
+
+Good documentation helps current developers understand implementation choices, future maintainers adapt the code safely, and AI systems assist effectively with code comprehension and generation.
+
+## Analysis Process Before Documenting {#analysis-process}
+1. First analyze the code to understand its overall structure and functionality
+2. Identify key components, functions, loops, conditionals, and complex logic
+3. Determine which elements require explanation based on complexity and importance
+4. Add comments strategically where they provide the most value
+
+## Top-Level (Module/File) Documentation {#top-level-docs}
+<!-- PRIORITY: MUST-HAVE -->
+- Always include a module docstring explaining the file's purpose
+- Document the module's role in the larger system architecture
+- Outline key design patterns and data flows
+- List any external dependencies and their purpose
+- Explain any non-obvious technical decisions that influenced the implementation
+- Highlight important maintenance considerations for the file
+
+## Class & Method Documentation {#class-method-docs}
+<!-- PRIORITY: MUST-HAVE -->
+- Use descriptive docstrings for all classes and public methods
+- Follow NumPy docstring format for Python code
+- Document parameters, return values, exceptions, and side effects
+- For complex methods, explain the algorithm or approach used
+- Include usage examples for non-trivial interfaces
+- Document class invariants and assumptions
+
+### Docstring Checklist
+- [ ] Class purpose and responsibility clearly stated
+- [ ] All public methods documented
+- [ ] Parameters, return types, and exceptions documented
+- [ ] Examples included for complex interfaces
+- [ ] Special cases and edge conditions noted
+
+## Inline Comments {#inline-comments}
+<!-- PRIORITY: RECOMMENDED -->
+- Use inline comments sparingly but strategically
+- Focus on explaining the "why" rather than the "what"
+- Comment on:
+  - Business logic that implements specific requirements
+  - Non-obvious optimizations or workarounds
+  - Security considerations
+  - Edge case handling
+- Avoid redundant comments that merely restate the code
+
+### Before and After Examples
+
+**❌ Poor inline comments:**
+```python
+# Loop through list
+for item in items:
+    # Get the value
+    value = item.value
+    # Add to total
+    total += value
+```
+
+**✅ Good inline comments:**
+```python
+# Process only active items to calculate billing totals
+for item in items:
+    # Skip archived items which should not affect billing
+    if item.status == "archived":
+        continue
+    
+    total += item.value
+```
+
+## Variable & Function Naming {#variable-function-naming}
+<!-- PRIORITY: MUST-HAVE -->
+- Prefer descriptive names that make the code self-documenting
+- Use consistent naming conventions throughout the codebase
+- When domain-specific terminology is used, explain it in comments
+
+## API Documentation {#api-docs}
+<!-- PRIORITY: MUST-HAVE -->
+- Document all API endpoints thoroughly
+- Include request/response formats and examples
+- Document authentication requirements
+- Explain error responses and handling
+
+### API Documentation Checklist
+- [ ] Endpoint purpose described
+- [ ] HTTP methods documented (GET, POST, etc.)
+- [ ] URL parameters explained
+- [ ] Request body schema defined
+- [ ] Response format and status codes documented
+- [ ] Error scenarios and error response formats included
+- [ ] Authentication requirements specified
+- [ ] Rate limits or other constraints noted
+- [ ] Example requests and responses provided
+
+## Project Documentation {#project-docs}
+<!-- PRIORITY: MUST-HAVE -->
+- Maintain a comprehensive README with:
+  - Project overview and purpose
+  - Setup and installation procedures
+  - Usage examples
+  - Configuration options and environment variables
+- Document permission requirements for different operations
+- Create and maintain architectural diagrams when helpful
+- Keep all documentation synchronized with code changes
+- Regularly review and update documentation as the code evolves
+
+## Specific Implementation Details {#specific-details}
+<!-- PRIORITY: RECOMMENDED -->
+- **Version Compatibility:** Document backward compatibility mechanisms and version support (e.g., Pydantic v1/v2 compatibility)
+- **Fallback Mechanisms:** Explain any fallback mechanisms in place, particularly for authentication or critical functionality
+- **Parameter Merging:** When applicable, document rules for parameter merging precedence
+- **Non-Changeable Code:** Clearly mark and explain code sections that should not be modified without careful consideration
+- **Security-Critical Components:** Provide detailed documentation for security-related code with explanations of security measures
+
+## Code Formatting {#code-formatting}
+<!-- PRIORITY: RECOMMENDED -->
+- When adding comments, always preserve the original code's formatting and structure
+- Keep indentation, line breaks, and spacing consistent with the existing code style
+- Position comments to minimize disruption to code readability
+- For languages with style guides (e.g., PEP 8 for Python), follow those conventions
+
+Remember that the goal is to help future developers (both human and AI) understand not just what the code does, but why it was implemented this particular way. Well-documented code serves as its own best explanation for both audiences.
+
+## Documentation Priority & Depth {#priority-depth}
+<!-- PRIORITY: MUST-HAVE -->
+- Prioritize **external-facing interfaces and APIs** first. These are most likely to be consumed by other teams or clients.
+- Next, document **core business logic** and algorithms that underpin crucial product behavior.
+- Finally, cover supporting utility code.  
+Use this order when tackling documentation backlogs or writing docs for new features.
+
+## AI-Friendly Annotations {#ai-annotations}
+<!-- PRIORITY: RECOMMENDED -->
+Introduce lightweight tags that help AI tools parse intent without cluttering human readability:
+- `# AI_DOC:` – high-level rationale a model can read quickly.
+- `# AI_NOTE:` – nuanced implementation detail that an LLM may need for accurate refactoring.
+- `# AI_CONTEXT:` - broader system context that helps with understanding relationships.
+- `# AI_WARN:` - potential pitfalls or areas requiring special attention.
+
+Keep tags concise; they should complement, not replace, regular comments/docstrings.
+
+### AI-Specific Documentation Patterns
+- Use structured, consistent formats that are easy to parse programmatically
+- Include explicit type information even in dynamically typed languages
+- Document invariants and assumptions that might not be obvious from the code
+- Explain the "why" behind unusual patterns or non-idiomatic code
+- Reference related code components with file paths when possible
+
+## Example Templates {#example-templates}
+Below are condensed examples you can copy-paste. Collapse longer samples if embedding in other docs.
+
+**Module docstring template**
+```python
+"""
+Module: authentication.py
+
+Purpose
+-------
+Handles user authentication: login, logout, session management.
+
+Design Patterns
+-------
+Singleton pattern for AuthManager.
+
+External Dependencies
+-------
+- bcrypt: password hashing
+- jwt: session tokens
+
+Technical Decisions
+-------
+JWT chosen for stateless sessions to enhance scalability.
+
+Maintenance Considerations
+-------
+Rotate token secrets periodically for security compliance.
+"""
+```
+
+**Class / method docstring (NumPy style)**
+```python
+class AuthManager:
+    """Singleton managing JWT-based authentication.
+
+    Parameters
+    ----------
+    secret : str
+        HMAC secret used to sign tokens.
+
+    Notes
+    -----
+    The instance is thread-safe.
+    """
+
+    def login(self, username: str, password: str) -> str:
+        """Validate credentials and return a JWT.
+
+        Parameters
+        ----------
+        username : str
+            User's login name.
+        password : str
+            Raw password (plain text – will be hashed internally).
+
+        Returns
+        -------
+        str
+            A signed JWT.
+        
+        Raises
+        ------
+        AuthenticationError
+            If credentials are invalid.
+        
+        Examples
+        --------
+        >>> auth = AuthManager(secret="my-secret")
+        >>> token = auth.login("user@example.com", "password123")
+        >>> print(token)
+        'eyJhbGciOiJIUzI1NiIs...'
+        """
+```
+
+**Inline strategic comment**
+```python
+# AI_DOC: Avoid timing attack by constant-time compare
+if hmac.compare_digest(hash_pw(input_pw), stored_hash):
+    ...
+```
+
+**API endpoint example**
+```yaml
+post /v1/login:
+  summary: User login
+  requestBody:
+    application/json:
+      schema: LoginRequest
+  responses:
+    200:
+      description: Success – returns JWT
+    401:
+      description: Invalid credentials
+```
+
+## Strategic Commenting Checklist {#commenting-checklist}
+Before adding a comment ask:
+1. Does it explain a **decision that's non-obvious**?
+2. Will it **prevent common misuse** or misunderstanding?
+3. Does it encode **domain knowledge** not obvious from code?
+4. Is it about **security, performance, or edge-cases**?
+If the answer to none of these is *yes*, reconsider adding the comment.
+
+## Security Documentation {#security-docs}
+<!-- PRIORITY: MUST-HAVE -->
+For any security-critical component add a dedicated section:
+- **Threat Model** – enumerate realistic attack vectors.
+- **Mitigation Strategy** – describe how the code prevents or limits each threat.
+- **Assumptions & Invariants** – e.g., *JWT secret stored in env var*.
+
+## Review & Update Policy {#review-policy}
+<!-- PRIORITY: RECOMMENDED -->
+- Docs are part of the definition of done. PR reviewers must reject code if accompanying docs are missing or outdated.
+- Perform quarterly sweeps to prune outdated sections and update diagrams/examples.
+
+## Tool Integration & Automation {#tool-integration}
+<!-- PRIORITY: OPTIONAL -->
+- Keep docstrings **Sphinx-compatible**. Run `make docs` (or CI) to catch formatting errors.
+- For API docs, sync OpenAPI specs via CI so examples stay up-to-date.
+
+## Domain Glossary Usage {#domain-glossary}
+<!-- PRIORITY: RECOMMENDED -->
+Maintain `docs/glossary.md` with domain-specific terms. Link to it using `@term` syntax so contributors have a single source of truth.
+
+## Documentation Tone & Style {#tone-style}
+<!-- PRIORITY: RECOMMENDED -->
+- Use a clear, neutral tone.
+- Favor active voice and present tense.
+- Avoid unnecessary jargon; explain domain-specific terms or link to glossary.
+
+## Red Flag Comments {#red-flag-comments}
+<!-- PRIORITY: RECOMMENDED -->
+Help identify problematic patterns in code with clear red flag comments:
+
+```python
+# ❌ Don't: # increment counter
+# ✅ Do:    # Track retry attempts to prevent infinite loops
+```
+
+## Docs-as-Pair-Programmer {#docs-as-pair-programmer}
+<!-- PRIORITY: RECOMMENDED -->
+Consider writing documentation with future developers in mind—a little empathy goes a long way. Document not just what code does, but the reasoning behind implementation choices to help future maintainers understand the context.
+
+## Navigation for Documentation Files {#navigation}
+<!-- PRIORITY: RECOMMENDED -->
+For documentation files (especially in `.cursor/rules`), add a quick TOC comment block at the top to help with scanning and cursor plugin parsing.
+

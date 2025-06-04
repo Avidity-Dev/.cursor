@@ -1,0 +1,28 @@
+---
+description: Guidelines for Excel file processing and data extraction
+globs: ["**/excel/**/*.py"
+alwaysApply: false
+---
+
+# EXCEL PROCESSING
+
+## File Handling
+- Use openpyxl for Excel file manipulation
+- Implement robust error handling for malformed Excel files
+- Document expected Excel formats and schemas
+- Handle both .xls and .xlsx formats appropriately
+- Implement proper file locking during operations
+
+## Data Extraction
+- Validate data before processing
+- Use pandas for data transformation and cleaning
+- Maintain column mapping documentation
+- Handle missing or malformed data gracefully
+- Implement data type validation and conversion
+
+## Performance Considerations
+- Use streaming for large Excel files
+- Implement memory-efficient processing
+- Cache processed data when appropriate
+- Use batch processing for multiple files
+- Monitor and log processing times 

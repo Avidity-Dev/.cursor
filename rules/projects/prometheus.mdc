@@ -1,0 +1,153 @@
+---
+description: 
+globs: prometheus/**
+alwaysApply: false
+---
+# Prometheus Project Overview
+
+## Project Code: PRO
+
+This document provides a comprehensive overview of the Prometheus project, a data pipeline solution leveraging dlt, dbt, and Dagster.
+
+## Core Technologies
+
+The project is built around the "Data Engineering Trinity":
+
+1. **dlt (Data Load Tool)**:
+   * **Purpose**: Handles data extraction and loading from various sources.
+   * **Location**: Pipelines are primarily defined in `prometheus/dlt/`.
+   * **Orchestration**: Managed by Dagster.
+   * **Key Concepts**: Sources, resources, pipelines, normalization.
+   * **Best Practices**:
+     * Schema handling and evolution
+     * Authentication and credentials management
+     * Incremental loading patterns
+     * Error handling and retries
+     * Pagination and rate limiting
+
+2. **dbt (Data Build Tool)**:
+   * **Purpose**: Manages the transformation layer using SQL models.
+   * **Location**: Found within the `transforms/` directory.
+   * **Key Concepts**: Models, materializations, macros, tests.
+   * **Best Practices**:
+     * Model organization and naming conventions
+     * Testing strategies
+     * Documentation
+     * Incremental models
+     * Optimizing for performance
+     * Common SQL patterns
+
+3. **Dagster**:
+   * **Purpose**: Orchestrates the entire data pipeline, including dlt and dbt runs.
+   * **Location**: Asset definitions are primarily in the main Python package directory `prometheus/`.
+   * **Key Concepts**: Assets, ops, jobs, schedules, sensors.
+   * **Best Practices**:
+     * Asset-based orchestration
+     * Testing and development workflow
+     * Monitoring and observability
+     * Partitioning
+     * Integration with the other tools
+
+## Project Directory Structure
+
+The project is organized as follows:
+
+* **`prometheus/`**: The main Python package containing Dagster assets and core orchestration logic.
+  * **`prometheus/dlt/`**: Contains dlt pipeline definitions for data ingestion.
+* **`transforms/`**: Houses dbt models for data transformation. More details below.
+* **`.dlt/`**: Stores local dlt pipeline state and secrets.
+* **`scripts/`**: Utility scripts for development and operational tasks.
+* **`tests/`**: Contains unit and integration tests for the project.
+* **`docs/`**: Project documentation.
+* **`.dev/journal/`**: Development journal for tracking progress and learnings.
+* **Configuration Files**:
+  * `pyproject.toml`: Python project metadata and dependencies.
+  * `requirements.txt`: Python dependency list.
+  * `setup.py` & `setup.cfg`: Python package setup information.
+  * `dagster.yaml`: Dagster instance configuration.
+  * `config.yaml`: General application or pipeline configuration.
+* **Containerization**:
+  * `Dockerfile`: Defines the Docker image for the project.
+  * `docker-compose.dev.yml`: Docker Compose configuration for local development environments.
+  * `.dockerignore`: Specifies files to ignore when building Docker images.
+* **Git & Environment**:
+  * `.git/`: Git repository metadata.
+  * `.gitignore`: Specifies intentionally untracked files that Git should ignore.
+  * `.venv/`: Python virtual environment.
+  * `.python-version`: Specifies the Python version for the project.
+* **CI/CD**:
+  * `.github/`: GitHub Actions workflows.
+
+## Transforms Directory Details
+
+The `transforms/` directory contains the dbt project responsible for data transformations. Its structure follows dbt best practices and includes:
+
+### Configuration Files
+* `dbt_project.yml`: Main configuration file defining project metadata, model directories, materializations, and variables.
+* `profiles.yml`: Database connection settings for development environments.
+* `packages.yml`: Third-party dbt packages dependencies.
+
+### Model Organization
+The models are organized in the `transforms/models/` directory using a layered approach:
+
+* `raw/`: Models that directly reference source data with minimal transformations, focusing on data type conversions and naming standardization.
+* `silver/`: Intermediate models that clean, validate, and enrich raw data.
+* `gold/`: Business-defined datasets that implement specific business logic and can be used directly by BI tools.
+* `marts/`: Subject-area specific models organized by business domain.
+* `mdm/`: Master Data Management models for entities like customers, products, etc.
+
+### Additional dbt Components
+* `macros/`: Reusable SQL snippets and functions for use across models.
+* `seeds/`: Static reference data as CSV files.
+* `docs/`: Generated documentation.
+
+### Best Practices for Working with transforms/
+When working with the dbt transforms:
+
+1. Follow the defined layer structure when creating new models:
+   * Raw models should perform minimal transformations
+   * Silver models handle data cleaning and standardization
+   * Gold models apply business logic
+   * Marts organize data by business domain
+
+2. Use the dbt documentation feature to document models, columns, and tests.
+
+3. Apply appropriate tests to ensure data quality:
+   * uniqueness
+   * not_null
+   * referential integrity
+   * accepted values
+
+4. Use incremental materialization for large tables where possible.
+
+5. Leverage macros for common SQL patterns to maintain consistency.
+
+6. Follow the established naming conventions for models and columns.
+
+## Workflow
+
+The typical data flow involves:
+1. **Ingestion**: `dlt` pipelines in `prometheus/dlt/` extract data from sources.
+2. **Loading**: `dlt` loads raw data into a staging area in the data warehouse.
+3. **Transformation**: `dbt` models in `transforms/` process and transform the raw data through the layering system (raw → silver → gold/marts).
+4. **Orchestration**: `Dagster` assets defined in `prometheus/` manage the scheduling and execution of both `dlt` and `dbt` tasks, ensuring data flows correctly and efficiently.
+
+## Key Principles
+
+* **Modularity**: Each tool (dlt, dbt, Dagster) handles a distinct part of the pipeline.
+* **Testability**: Emphasis on testing at each stage (dlt sources, dbt models, Dagster assets).
+* **Observability**: Leveraging Dagster and other tools for monitoring pipeline health and performance.
+* **Incremental Processing**: Designing pipelines to process data incrementally where possible for efficiency.
+* **Data Quality**: Implementing appropriate tests and validation throughout the pipeline.
+
+## Best Practices
+
+When working with the Prometheus project:
+
+1. Start with understanding the data flow from source to destination.
+2. Familiarize yourself with the organization of models in the `transforms/` directory.
+3. Follow the established patterns for each tool in the trinity.
+4. Focus on maintaining clean boundaries between extraction, loading, and transformation.
+5. Leverage the built-in testing capabilities of dbt and Dagster.
+6. Document your work thoroughly, especially for complex transformations.
+7. Remember that the most elegant data engineering solutions are often the simplest ones. Don't over-engineer. Start small, test thoroughly, and expand methodically.

@@ -1,0 +1,118 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# Dagster Rule
+
+This rule provides guidelines for working with Dagster, focusing on assets, resources, and definitions.
+
+## Assets
+
+Assets are the core unit of computation in Dagster. They represent data objects that are produced or updated by your data pipelines.
+
+### Defining Assets
+
+Assets are defined using the `@asset` decorator.
+
+```python
+import dagster as dg
+
+@dg.asset
+def my_data_asset(context: dg.AssetExecutionContext):
+    # Your computation logic here
+    data = {"key": "value"}
+    context.log.info(f"Produced data: {data}")
+    return data
+
+@dg.asset(deps=[my_data_asset])
+def downstream_asset(context: dg.AssetExecutionContext, my_data_asset):
+    # This asset depends on my_data_asset
+    # The output of my_data_asset is passed as an argument
+    processed_data = {k: v.upper() for k,v in my_data_asset.items()}
+    context.log.info(f"Processed data: {processed_data}")
+    return processed_data
+```
+
+- Each asset is a Python function.
+- The `AssetExecutionContext` provides access to logging and other contextual information.
+- Dependencies between assets can be specified using the `deps` argument, which takes a list of upstream assets. The upstream asset's output will be passed as an argument to the downstream asset function.
+
+### Materializing Assets
+
+To compute and store the data an asset represents, you "materialize" it. This can be done via the Dagster UI or programmatically.
+
+When materializing an asset that has configuration, you can provide the configuration in the run:
+
+```yaml
+ops:
+  query: # 'query' is the name of the asset in this example
+    config:
+      question: What is Dagster?
+```
+
+## Resources
+
+Resources in Dagster are a way to configure and manage external services or connections that your assets and ops need to interact with. Examples include database connections, API clients, or file system handlers.
+
+Resources allow you to:
+- Encapsulate reusable logic.
+- Manage configuration for external systems separately from your business logic.
+- Make your assets and ops more testable by allowing you to mock or replace resources during testing.
+
+Refer to the official Dagster documentation for detailed examples on how to define and use resources, including how to use the advanced config types for resources.
+
+## Definitions
+
+Definitions are used to group your assets, jobs, schedules, sensors, and resources into a single, deployable unit. This is typically done in a `definitions.py` file or a similar entry point for your Dagster project.
+
+```python
+import dagster as dg
+
+@dg.asset
+def hello(context: dg.AssetExecutionContext):
+    context.log.info("Hello!")
+
+@dg.asset(deps=[hello])
+def world(context: dg.AssetExecutionContext):
+    context.log.info("World!")
+
+# Example of a job definition
+my_job = dg.define_asset_job("my_job", selection=[hello, world])
+
+# Example of a sensor that uses a cursor
+MY_DIRECTORY = "data"
+@dg.sensor(
+    job=my_job,
+    minimum_interval_seconds=5,
+    default_status=dg.DefaultSensorStatus.RUNNING,
+)
+def updated_file_sensor(context: dg.SensorEvaluationContext):
+    last_mtime = float(context.cursor) if context.cursor else 0
+    max_mtime = last_mtime
+    # ... (sensor logic as per documentation example) ...
+    # Loop through directory and yield RunRequest if a file is updated
+    # ...
+    context.update_cursor(str(max_mtime))
+
+
+defs = dg.Definitions(
+    assets=[hello, world],
+    jobs=[my_job],
+    sensors=[updated_file_sensor]
+    # You can also include resources, schedules, etc.
+    # resources={"my_db_connection": my_database_resource}
+)
+```
+
+- `dg.Definitions` takes lists of assets, jobs, schedules, sensors, and resources.
+- This object is what Dagster tools (like the UI and CLI) use to understand your project.
+
+### Sensors and Cursors
+
+Sensors can be used to monitor external systems and trigger runs. For high-volume event streams, cursors can be used to manage state and optimize performance.
+- The `SensorEvaluationContext` provides `context.cursor` to read the last persisted state and `context.update_cursor()` to save the new state.
+- Cursors allow custom logic for managing state, unlike simple run keys.
+- If you plan to reset a sensor's cursor and want to re-trigger runs for unchanged data, avoid setting `run_key`s on `RunRequest`s.
+
+For more advanced use cases and configurations, always refer to the official [Dagster documentation](mdc:https:/docs.dagster.io).

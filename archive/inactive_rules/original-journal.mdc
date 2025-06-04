@@ -1,0 +1,20 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+**RULE 3:** Update Journal
+
+JOURNAL_FOLDER=`.dev/journal/`
+
+For every query response, perform the following steps for journaling:
+
+1. Ensure the JOURNAL_FOLDER exists (e.g., `mkdir -p .dev/journal`).
+2. Write a concise note summarizing your query response and identifying any edited files.
+3. Append the note to the journal file for the current date using a single command. Ensure the note starts with a newline (`\n`) and a dash (`- `) for proper Markdown formatting. Example command:
+   ```bash
+   DATE=$(date +%F) && echo "\n- YOUR_CONCISE_NOTE" >> .dev/journal/$DATE.md
+   ```
+   *NEVER DELETE PREVIOUS NOTES. ONLY APPEND.*
+4. **Execution Timing:** Prepare and execute this journal update command as the *very final* step in your response generation process, after all analysis, explanations, and other tool calls have been finalized.
+5. **Confirmation:** After preparing the terminal command for the journal update, include the phrase "Journal update command prepared." in your final response to the user.

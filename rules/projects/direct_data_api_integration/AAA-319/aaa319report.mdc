@@ -1,0 +1,195 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# Project Report: PRJ_018 - Direct Data API - AAA-319
+
+**Report Date:** 2025-05-20
+**PRD:** [PRD_018_AAA319_DLT_CSV_Loading](./aaa319prd.md) (Linear Task: AAA-319)
+
+## Table of Contents
+- [1. Project Overview](#1-project-overview)
+- [2. Project Context & Workflow](#2-project-context--workflow)
+- [3. Implementation Status](#3-implementation-status)
+- [4. Error Log](#4-error-log)
+- [5. Design Decisions](#5-design-decisions)
+- [6. Technical Insights](#6-technical-insights)
+- [7. Plan Deviations](#7-plan-deviations)
+- [8. Future Improvements](#8-future-improvements)
+- [9. Change Log](#9-change-log)
+
+## 1. Project Overview
+
+This report tracks the progress for Linear issue **AAA-319** of the Veeva CRM Direct Data API integration project. This task focuses on developing a Dagster asset that utilizes dlt's multi-file loading capabilities to read CSV files from ADLS and load them into Snowflake. This is the final step in the ELT process, making Veeva CRM data available for analytics, dbt transformations, and business intelligence.
+
+The implementation involves creating a new `@multi_file_assets` definition in `prometheus/dlt/sources/veeva/assets.py` that can source data from the ADLS location where unpacked Veeva CRM CSV files reside (output of AAA-318), process these files using the `MultiFileResource`, and load them into Snowflake with appropriate schema and table naming.
+
+## 2. Project Context & Workflow
+
+This task is part of the Veeva CRM Direct Data API integration project, with the following related Linear issues:
+
+1. AAA-317: Retrieved raw data archives from Veeva CRM via Direct Data API and stored in ADLS.
+   - [PRD](../AAA-317/aaa317prd.md)
+   - [Report](../AAA-317/aaa317report.md)
+
+2. AAA-318: Unpacked the raw archives into individual CSV files and stored them in a structured location in ADLS.
+   - [PRD](../AAA-318/aaa318prd.md)
+   - [Report](../AAA-318/aaa318report.md)
+
+3. AAA-319 (Current Task): Loading unpacked CSV files from ADLS to Snowflake using DLT multi-file asset.
+
+## 3. Implementation Status
+
+* **Task:** [Task ID 1] Update Configuration Files
+  **Status:** Not Started
+  **Notes:** Need to add Veeva CRM Direct Data configuration to `.dlt/config.toml` and corresponding constants to `prometheus/dlt/sources/veeva/config.py`.
+
+    * **Sub-Task:** Add Veeva CRM Direct Data configuration to `.dlt/config.toml`
+      **Status:** Not Started
+      **Notes:** Add a new section `[veeva.crm.direct_data]` with appropriate `models`, `asset_prefix`, and `dest_schema` values.
+
+    * **Sub-Task:** Add constants to `prometheus/dlt/sources/veeva/config.py`
+      **Status:** Not Started
+      **Notes:** Define constants for `VEEVA_CRM_DIRECT_DATA_MODELS`, `VEEVA_CRM_DIRECT_DATA_ASSET_PREFIX`, and `VEEVA_CRM_DIRECT_DATA_DEST_SCHEMA` similar to other Veeva data sources.
+
+* **Task:** [Task ID 2] Create Multi-File Asset Definition
+  **Status:** Not Started
+  **Notes:** Implement a new `@multi_file_assets` definition in `prometheus/dlt/sources/veeva/assets.py`.
+
+    * **Sub-Task:** Define the multi-file asset function structure
+      **Status:** Not Started
+      **Notes:** Create the `veeva_crm_direct_data_multi_asset` function with appropriate decorator parameters, including `name`, `group_name`, `base_names`, `dest_schema`, and `table_prefix`.
+
+    * **Sub-Task:** Implement the asset function body
+      **Status:** Not Started
+      **Notes:** Implement the function body with run configuration parsing, error handling, and integration with the `MultiFileResource.run()` method.
+
+    * **Sub-Task:** Configure ADLS source parameters
+      **Status:** Not Started
+      **Notes:** Set up the asset to read from the correct ADLS location where unpacked Veeva CRM CSV files reside.
+
+* **Task:** [Task ID 3] Update Dagster Definitions
+  **Status:** Not Started
+  **Notes:** Update relevant sections in `prometheus/dlt/definitions.py` to include the new asset.
+
+    * **Sub-Task:** Ensure necessary resources are configured and available
+      **Status:** Not Started
+      **Notes:** Verify that `MultiFileResource` is properly configured with Snowflake as the destination.
+
+    * **Sub-Task:** Add the new asset to Dagster definitions
+      **Status:** Not Started
+      **Notes:** Include the new asset in the appropriate Dagster definition for proper orchestration.
+
+* **Task:** [Task ID 4] Implement Testing
+  **Status:** Not Started
+  **Notes:** Develop and execute tests for the new multi-file asset.
+
+    * **Sub-Task:** Create local tests with sample CSV files
+      **Status:** Not Started
+      **Notes:** Create sample CSV files matching the expected Veeva CRM structure and test the asset locally.
+
+    * **Sub-Task:** Perform integration testing
+      **Status:** Not Started
+      **Notes:** Test with actual unpacked Veeva CRM files from ADLS to verify successful loading into Snowflake.
+
+* **Task:** [Task ID 5] Documentation
+  **Status:** Not Started
+  **Notes:** Create and update documentation for the new asset and related components.
+
+    * **Sub-Task:** Add docstrings to the new asset function
+      **Status:** Not Started
+      **Notes:** Add comprehensive docstrings to the `veeva_crm_direct_data_multi_asset` function and any helper functions.
+
+    * **Sub-Task:** Document configuration parameters and expected behavior
+      **Status:** Not Started
+      **Notes:** Create clear documentation about the configuration parameters, file naming conventions, and table mapping.
+
+    * **Sub-Task:** Update repository structure documentation
+      **Status:** Not Started
+      **Notes:** Run the tree command to update `docs/repository_structure.md` after implementation is complete.
+
+## 4. Error Log
+
+*No errors encountered yet as implementation has not started.*
+
+## 4.1. Source Code Errors
+
+* **Error:** None
+  **Date:** -
+  **Task ID:** -
+  **Description:** -
+  **Root Cause:** -
+  **Solution:** -
+  **Prevention:** -
+
+## 4.2. Testing Errors
+
+* **Error:** None
+  **Date:** -
+  **Task ID:** -
+  **Description:** -
+  **Root Cause:** -
+  **Solution:** -
+  **Prevention:** -
+
+## 5. Design Decisions
+
+Key design decisions from the PRD include:
+
+1. **Multi-File Asset Structure**: Using the `@multi_file_assets` decorator to create an asset that can process multiple CSV files in parallel, following the pattern established for other Veeva data sources.
+
+2. **Configuration Approach**: Using the `.dlt/config.toml` file to define model names, asset prefix, and destination schema for the Veeva CRM Direct Data, keeping configuration centralized and consistent with other data sources.
+
+3. **File Processing Strategy**: Processing CSV files using the `MultiFileResource`, which handles the extraction and loading of data from files to Snowflake.
+
+4. **ADLS Path Structure**: Following the path structure defined in AAA-318 for accessing unpacked CSV files.
+
+5. **Snowflake Table Naming**: Using a schema (`ingest_veeva`) and table prefix (`crm__`) to organize the loaded data in Snowflake.
+
+## 6. Technical Insights
+
+*Will be populated during implementation.*
+
+For now, the following dependencies and constraints are identified:
+
+* **Dependencies**:
+  * The `MultiFileResource` from `prometheus/dlt/integrations/multi_file/resource.py` is needed for processing files
+  * DLT must be properly configured for Snowflake as a destination
+  * AAA-318 must be completed with unpacked CSV files available in the expected ADLS location
+  * Authentication to ADLS and Snowflake must be properly configured
+
+* **Assumptions**:
+  * CSV files from Veeva CRM unpacked in AAA-318 have a consistent structure
+  * The ADLS location is accessible with the configured authentication
+  * Snowflake destination is configured and accessible
+  * File naming and structure from AAA-318 follows the documented pattern
+  * The volume of data is manageable for batch loading (no streaming requirements)
+
+## 7. Plan Deviations
+
+*No plan deviations yet as implementation has not started.*
+
+* **Deviation:** None
+  **Date:** -
+  **Original Plan:** -
+  **Deviation Description:** -
+  **Reason:** -
+  **Impact:** -
+  **Lessons Learned:** -
+
+## 8. Future Improvements / TODOs
+
+*Capture any TODOs, recommended refactors, code improvements, etc. here*
+
+
+
+
+
+## 8. Change Log
+
+* **Change:** Initial creation of report for AAA-319
+  **Date:** 2025-05-17
+  **Version:** 1.0
+  **Author:** AI Assistant
+  **Description:** Created initial project report template with implementation tasks broken down from the PRD.

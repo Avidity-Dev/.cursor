@@ -1,0 +1,334 @@
+---
+description:
+globs:
+alwaysApply: false
+---
+# Veeva Direct Data API: Comprehensive Implementation Guide
+
+This consolidated guide provides comprehensive coverage of working with Veeva's Direct Data API, from understanding the API itself to implementing an efficient dlt pipeline for loading Veeva data into a data warehouse.
+
+## Table of Contents
+
+- [1. Introduction to Veeva Direct Data API](#1-introduction-to-veeva-direct-data-api)
+- [2. API Key Concepts](#2-api-key-concepts)
+  - [2.1 File Types](#21-file-types)
+  - [2.2 Included Data](#22-included-data)
+  - [2.3 Core API Operations](#23-core-api-operations)
+- [3. Understanding Veeva Data Format](#3-understanding-veeva-data-format)
+  - [3.1 File Naming Convention](#31-file-naming-convention)
+  - [3.2 Internal File Structure](#32-internal-file-structure)
+  - [3.3 Manifest CSV](#33-manifest-csv)
+  - [3.4 Metadata CSV](#34-metadata-csv)
+  - [3.5 Data Extracts](#35-data-extracts)
+- [4. Data Handling Considerations](#4-data-handling-considerations)
+  - [4.1 Multipart Files](#41-multipart-files)
+  - [4.2 Streaming Requirements](#42-streaming-requirements)
+  - [4.3 Incremental Loads and Deletes](#43-incremental-loads-and-deletes)
+  - [4.4 Schema Management](#44-schema-management)
+- [5. Implementation with dlt](#5-implementation-with-dlt)
+  - [5.1 Pipeline Architecture](#51-pipeline-architecture)
+  - [5.2 Transformer Pattern](#52-transformer-pattern)
+  - [5.3 Type Mapping](#53-type-mapping)
+  - [5.4 Handling Deletes](#54-handling-deletes)
+  - [5.5 Schema Derivation](#55-schema-derivation)
+  - [5.6 Complete Example](#56-complete-example)
+- [6. Best Practices](#6-best-practices)
+  - [6.1 Testing Strategy](#61-testing-strategy)
+  - [6.2 Performance Considerations](#62-performance-considerations)
+  - [6.3 Error Handling](#63-error-handling)
+  - [6.4 Common Pitfalls](#64-common-pitfalls)
+
+## 1. Introduction to Veeva Direct Data API
+
+The Veeva Direct Data API provides access to large volumes of data from your Vault instance in a format suitable for loading into a data warehouse. This API is not enabled by default and requires contacting Veeva Support to enable it for your Vault.
+
+### Prerequisites
+
+1. **Enable Direct Data API**: Contact Veeva Support to enable this feature in your Vault.
+2. **Integration User**: Configure an integration user in your Vault with the necessary permissions for Direct Data API endpoints.
+
+## 2. API Key Concepts
+
+### 2.1 File Types
+
+Direct Data API provides data in three main file types:
+
+- **Full (F)**: A complete dataset from Vault creation to the current date. Generated daily (01:00 UTC), available for 2 days. Used for initial data load. Start time is always `00:00 Jan 1, 2000`.
+- **Incremental (N)**: Contains data changes within a 15-minute interval. 96 files per day, published 15 minutes after their `stop_time`, available for 10 days. Used for ongoing updates.
+- **Log (L)**: Audit log data for a single day. Published daily (01:00 UTC), available for 2 days.
+
+### 2.2 Included Data
+
+The API extracts:
+- Vault Objects (custom and standard)
+- Documents (metadata, types, relationships, fields; excludes source files, renditions)
+- Picklists (referenced ones only)
+- Workflows (instances, items, tasks; excludes participant group details)
+- Audit Logs (System, Document, Object, Login)
+
+This is not configurable; all listed data is always provided.
+
+### 2.3 Core API Operations
+
+Refer to the [Vault API Reference](https://developer.veevavault.com/api/25.1/#Direct_Data) for endpoint details.
+
+#### Authentication
+- Use standard Vault authentication endpoints to get a session ID for the integration user.
+
+#### Retrieving Available Files
+- Endpoint: `GET /api/{version}/services/directdata/files`
+- Lists all Direct Data files available for download.
+- Supports filtering by `extract_type`, `start_time`, and `stop_time`.
+
+#### Downloading Files
+- Endpoint: `GET /api/{version}/services/directdata/files/{filename_or_url}`
+- After identifying a file to download, use this endpoint or the provided URL.
+
+#### Filtering Files
+- **By File Type**: Use `extract_type` query parameter (`full_directdata`, `incremental_directdata`, `log_directdata`).
+- **By Time**: Use `start_time` and `stop_time` query parameters (ISO format `YYYY-MM-DDTHH:MMZ`).
+- **Filter out Files with No Changes**: Check the `record_count` attribute in the response. If `0`, skip downloading.
+
+## 3. Understanding Veeva Data Format
+
+### 3.1 File Naming Convention
+
+`{vaultid}-{date}-{stop_time}-{type}.tar.gz.{filepart}`
+- `vaultid`: Vault's ID
+- `date`: Creation date (YYYYMMDD)
+- `stop_time`: Interval stop time (HHMM)
+- `type`: F (Full), N (Incremental), L (Log)
+- `filepart`: Part number (NNN) if >1GB.
+
+### 3.2 Internal File Structure
+
+Files are `.tar.gz` archives containing CSV extracts.
+
+### 3.3 Manifest CSV
+
+- Located in the root of the archive.
+- Lists all extracts in the file, their labels, types (for incremental, e.g., "updates", "deletes"), record counts, and relative paths to the CSV files.
+- **Crucial for Processing**: The manifest is the primary driver for identifying which files to process, their intended action (data load, deletion), and their target entity/table.
+- Helps in skipping empty files by checking `record_count`.
+
+### 3.4 Metadata CSV
+
+- `metadata.csv`: 
+  - In **Incremental files**: Found in the `Metadata` folder. Defines the structure of each extract with changed data.
+  - In **Full files**: Found in the root folder. Defines the structure for *all data*.
+- `metadata_full.csv`: In Incremental files (root folder), provides metadata for *all* Vault data.
+- Key columns: `extract`, `extract_label`, `column_name`, `column_label`, `type`, `length`, `related_extract`.
+- **Crucial for Schema Management**: Essential for defining target table schemas and identifying schema changes.
+
+### 3.5 Data Extracts
+
+CSV files containing data for:
+- **Documents**: `document_version__sys.csv`, `document_relationships__sys.csv` (and `_deletes` versions).
+- **Vault Objects**: `{objectname}__v.csv` (e.g., `product__v.csv`) and `{objectname}_deletes.csv`.
+- **Picklists**: `picklist__sys.csv`.
+- **Workflows**: `workflow__sys.csv`, `workflow_item__sys.csv`, `workflow_task__sys.csv`.
+- **Logs**: Specific CSVs for each log type.
+
+## 4. Data Handling Considerations
+
+### 4.1 Multipart Files
+
+Files >1GB are split. Download all parts (`.001`, `.002`, etc.) and concatenate them *before* attempting to decompress the `.tar.gz` archive. Any processing pipeline should expect to receive a single, complete `.tar.gz` file stream.
+
+### 4.2 Streaming Requirements
+
+Due to potentially large file sizes, tarballs *must* be processed as streams to avoid out-of-memory errors. Specific implementation techniques:
+
+- Use `tarfile.open(fileobj=stream, mode="r:gz")` with a direct file stream
+- Avoid loading the entire tarball content into an in-memory buffer
+- Process files sequentially within the tarball
+
+### 4.3 Incremental Loads and Deletes
+
+Veeva provides "Incremental (N)" files containing changes within a specific interval:
+
+- The `manifest.csv` identifies files containing delete information (via `type="deletes"` or `_deletes.csv` naming)
+- It also identifies files with new/updated records (`type="updates"`)
+- The pipeline must account for deletes to maintain data accuracy:
+  - Identify delete records/files in the transformer based on the manifest
+  - Use appropriate merge strategies with primary keys
+  - Consider delete propagation in downstream models if needed
+
+### 4.4 Schema Management
+
+Use `metadata.csv` (and variants) to inform schema design and manage evolution:
+
+- **Initial Load**: Define schema based on `metadata.csv` from a Full load
+- **Incremental Loads**: Detect schema changes by:
+  1. Checking for specific metadata change files
+  2. Comparing metadata to current target schema
+- Apply schema changes before loading incremental data
+- Consider how the chosen data loading tool handles schema evolution
+
+## 5. Implementation with dlt
+
+### 5.1 Pipeline Architecture
+
+The recommended pipeline architecture consists of:
+
+1. **Intermediate Cloud Storage (Landing Zone):**
+   - Veeva `.tar.gz` exports should first be landed in cloud blob storage
+   - Benefits: Decoupling, resilience, raw data archive, efficient processing
+   - The `dlt` pipeline reads from this landing zone
+
+2. **dlt.sources.filesystem for Tarball Discovery:**
+   - Use `dlt.sources.filesystem` to discover `.tar.gz` files
+   - Configure with `incremental=dlt.sources.incremental.last_modified()`
+
+3. **Custom dlt.transformer for Unpacking & Parsing:**
+   - Implements streaming, manifest parsing, and data extraction
+   - Dynamically routes data to appropriate tables
+
+4. **dlt.pipeline Configuration:**
+   - Define with appropriate destination and schema settings
+
+### 5.2 Transformer Pattern
+
+```python
+@dlt.transformer
+def read_tar_gz(file_items_stream: Iterator[FileItemDict]) -> Iterator[TDataItems]:
+    for file_item in file_items_stream:
+        # CRITICAL: Direct streaming without loading entire tarball into memory
+        with file_item.open("rb") as file_stream:
+            with tarfile.open(fileobj=file_stream, mode="r:gz") as tar:
+                # Process tar contents...
+```
+
+Process the manifest before any other files:
+
+```python
+# First locate and extract the manifest
+try:
+    manifest_member = tar.getmember("manifest.csv")
+    manifest_file = tar.extractfile(manifest_member)
+    if manifest_file:
+        # Parse the manifest using a streaming approach
+        manifest_rows = list(csv.DictReader(io.TextIOWrapper(manifest_file, encoding='utf-8')))
+        
+        # Sort manifest rows to ensure metadata files are processed first
+        manifest_rows = sort_manifest_entries_by_priority(manifest_rows)
+        
+        # Process each file according to manifest information
+        for entry in manifest_rows:
+            process_manifest_entry(tar, entry)
+except KeyError:
+    # Fallback handling if manifest not found
+```
+
+### 5.3 Type Mapping
+
+Use this mapping to convert Veeva types to DLT/Snowflake types:
+
+| Veeva Type | DLT Data Type | Snowflake Type | Notes |
+|------------|--------------|----------------|-------|
+| `id` | `dlt.String()` | `VARCHAR` | Primary key for most objects |
+| `datetime`, `timestamp with time zone` | `dlt.Timestamp()` | `TIMESTAMP_TZ` | |
+| `boolean` | `dlt.Boolean()` | `BOOLEAN` | |
+| `number`, `numeric` | `dlt.Decimal()` | `NUMERIC` | |
+| `date` | `dlt.Date()` | `DATE` | |
+| default | `dlt.String()` | `VARCHAR` | For unrecognized types |
+| multirelationship | `dlt.String()` | `VARCHAR(65535)` | Special handling for field length |
+| rich text | `dlt.String()` | `VARCHAR(64000)` | As specified in Veeva docs |
+
+### 5.4 Handling Deletes
+
+```python
+def process_delete_file(tar, file_path, derived_table_name, primary_key_cols):
+    """
+    Process a delete file, yielding only primary key values for deleted records.
+    """
+    delete_member = tar.getmember(file_path)
+    delete_file = tar.extractfile(delete_member)
+    
+    if delete_file:
+        delete_rows = csv.DictReader(io.TextIOWrapper(delete_file, encoding='utf-8'))
+        # Only include primary key columns in yielded data
+        pk_only_rows = [{col: row.get(col) for col in primary_key_cols} for row in delete_rows]
+        
+        if pk_only_rows:
+            # Mark these rows for deletion via dlt's merge mechanism
+            yield dlt.mark.with_table_name(pk_only_rows, derived_table_name)
+```
+
+### 5.5 Schema Derivation
+
+```python
+def build_dlt_schema_from_metadata(metadata_dict):
+    """
+    Converts Veeva metadata into a dlt.Schema object.
+    """
+    schema_dict = {}
+    
+    for extract_name, extract_info in metadata_dict.items():
+        table_name = sanitize_table_name(extract_name)
+        columns = {}
+        
+        for col_name, col_info in extract_info['columns'].items():
+            # Apply the type mapping
+            dlt_type = map_veeva_type_to_dlt(col_info['type'], col_info['length'], col_name)
+            columns[sanitize_column_name(col_name)] = dlt_type
+        
+        # Determine primary key
+        primary_key = determine_primary_keys(extract_name, metadata_dict)
+        
+        # Add table schema
+        schema_dict[table_name] = {
+            'columns': columns,
+            'primary_key': primary_key,
+            # Use same key for merge operations
+            'merge_key': primary_key
+        }
+    
+    return dlt.Schema(schema_dict)
+```
+
+### 5.6 Complete Example
+
+See the PRD_018_vault_to_flake.md document for a comprehensive implementation example.
+
+## 6. Best Practices
+
+### 6.1 Testing Strategy
+
+Unit test critical components independently:
+
+1. **Manifest Parsing**: Test with various manifest formats
+2. **Metadata Processing**: Test schema generation from various metadata structures 
+3. **Type Mapping**: Verify all Veeva types map correctly
+4. **Delete Handling**: Ensure delete records yield only PKs correctly
+5. **Streaming**: Test with mock file-like objects to verify streaming behavior
+
+### 6.2 Performance Considerations
+
+- **Processing Speed**: Expect ~50-100MB/sec on modern hardware for tarball extraction
+- **Memory Usage**: Should remain constant regardless of tarball size (~200-500MB base + batch memory)
+- **Batch Size**: Use 1,000-5,000 rows per batch for optimal performance
+- **Parallelization**: Process multiple tarballs concurrently (1 worker per CPU core)
+
+### 6.3 Error Handling
+
+Implement robust error handling:
+
+1. **Corrupted Archives**: Catch and log `tarfile.ReadError` exceptions
+2. **Missing Files**: Handle cases where manifest-referenced files are missing
+3. **Parse Errors**: Gracefully handle CSV parsing errors
+4. **Type Conversion Failures**: Implement safe type conversion with fallbacks
+
+### 6.4 Common Pitfalls
+
+1. **Loading entire tarball into memory**: Always stream directly
+2. **Ignoring manifest information**: Use manifest to drive all processing
+3. **Insufficient error handling**: Implement robust error handling for each file extraction
+4. **Missed type mappings**: Ensure complete coverage of all Veeva types
+5. **Not sanitizing table/column names**: Handle Veeva naming conventions properly
+6. **Neglecting schema evolution**: Plan for how schema changes will be handled
+
+## Open-Source Resources
+
+Veeva provides open-source accelerators on GitHub for loading data into systems like Snowflake, Databricks, and Redshift:
+- [GitHub Repository](https://github.com/veeva/Vault-Direct-Data-API-Accelerators)

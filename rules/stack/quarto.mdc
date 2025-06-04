@@ -1,0 +1,75 @@
+---
+description: 
+globs: *.qmd
+alwaysApply: false
+---
+# Understanding `.qmd` (Quarto) Files
+
+## Quarto Overview
+
+Quarto is a scientific and technical publishing system that uses markdown enhanced with embedded code blocks. It allows for **reproducible documents**, **data visualization**, and **interactive analysis**, often used with R, Python, or Julia.
+
+## Structure of `.qmd` Files
+
+### 1. YAML Front Matter (optional)
+
+```yaml
+---
+title: "My Analysis"
+author: "Data Wizard"
+format: html
+---
+```
+
+Defines document-level metadata like title, author, and output format.
+
+### 2. Markdown Text
+
+Regular markdown is used for narrative content:
+
+```markdown
+## Introduction
+This document explores the deep mysteries of the dataset.
+```
+
+### 3. Code Cells / Chunks
+
+Executable blocks in supported languages (typically R, Python):
+
+```{r}
+summary(cars)
+```
+
+or with metadata:
+
+```{python}
+#| label: calculate-mean
+df.mean()
+```
+
+- `#| label:` provides a label for the code cell (often used for referencing or documentation).
+- Inline code is supported using backticks: `` `r 2 + 2` ``
+
+### 4. Comments and Explanatory Notes
+
+Markdown text can appear between code blocks to describe logic, rationale, or results.
+
+### 5. Output from Code
+
+Code outputs (e.g., tables, plots, lists) appear **beneath** the corresponding code block. These are part of the rendered result and should be associated with the block above.
+
+## Reading `.qmd` Files
+
+To interpret a Quarto file:
+
+- Detect **code blocks** by triple backticks and `{language}` markers.
+- Capture **labels and metadata** using the `#|` syntax inside code chunks.
+- Treat all non-code as **narrative markdown** or commentary.
+- Associate **outputs with the code block** directly above them.
+- Read the **YAML front matter** to understand document settings and rendering preferences.
+
+## Additional Notes
+
+- `.qmd` files can be rendered to formats like **HTML, PDF, and slides**.
+- Code inside blocks is **executed**, and the output is embedded in the final document.
+- Think of `.qmd` as a hybrid of Markdown, R Markdown, and Jupyter Notebooks.

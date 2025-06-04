@@ -1,0 +1,41 @@
+---
+description: If you need to know about the Linear SDK.
+globs: 
+alwaysApply: false
+---
+# Linear SDK Documentation
+
+This documentation covers the comprehensive guide to the Linear TypeScript SDK.
+
+## Table of Contents
+
+1. [Linear SDK Capabilities Overview](mdc:prometheus/@docs/chapters/overview.md)
+2. [Getting Started with Linear SDK](mdc:prometheus/@docs/chapters/getting-started.md)
+3. [Fetching & Modifying Data with Linear SDK](mdc:prometheus/@docs/chapters/data-operations.md)
+4. [Error Handling in Linear SDK](mdc:prometheus/@docs/chapters/error-handling.md)
+5. [Advanced Usage with Linear SDK](mdc:prometheus/@docs/chapters/advanced-usage.md)
+6. [Webhooks in Linear SDK](mdc:prometheus/@docs/chapters/webhooks.md)
+7. Guides for Linear API
+   - [How to Upload a File to Linear](mdc:prometheus/@docs/chapters/guides/file-upload.md)
+   - [How to Create New Issues Using linear.new](mdc:prometheus/@docs/chapters/guides/linear-new.md)
+
+## Overview
+
+The Linear TypeScript SDK provides a strongly typed interface to the Linear GraphQL API, allowing developers to build integrations and tools for Linear, the issue tracking platform.
+
+See the [Linear SDK Capabilities Overview](mdc:prometheus/@docs/chapters/overview.md) for a complete introduction to the SDK's features.
+
+## Getting Started
+
+To get started with the Linear SDK:
+
+1. Install the package: `npm install @linear/sdk`
+2. Create a client with your API key or access token
+3. Start querying your Linear data
+
+See the [Getting Started with Linear SDK](mdc:prometheus/@docs/chapters/getting-started.md) guide for complete instructions.
+
+## Additional Resources
+
+- [Linear API Documentation](mdc:prometheus/https:/developers.linear.app/docs)
+- [SDK Source Code on GitHub](mdc:prometheus/https:/github.com/linear/linear/tree/master/packages/sdk) 

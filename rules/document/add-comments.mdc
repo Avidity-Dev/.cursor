@@ -1,0 +1,37 @@
+---
+description: How to improve top-level and lower-level documentation.
+globs: 
+alwaysApply: false
+---
+**Rule Name:** add-comments
+
+**Description:**
+
+This rule is designed to ensure that new or updated files in the codebase are thoroughly documented. The goal is to make the code more approachable for future developers by providing clear explanations of both the functionality and the design decisions behind the code. 
+
+**Guidelines:**
+
+1. **Top-Level Documentation:**
+   - **Purpose:** Clearly describe what the file does and how it integrates into the broader codebase.
+   - **Design Patterns:** Explain any design patterns or architectural decisions that were made.
+   - **Workflows and Data Flows:** Outline key workflows and data flows within the file.
+   - **Maintenance Considerations:** Highlight important considerations for maintaining the code.
+
+2. **Class and Method Documentation:**
+   - **Purpose and Responsibility:** Document the purpose and responsibility of each class and method.
+   - **Parameters:** Provide detailed explanations of parameters, including specific implementation details.
+   - **Return Values and Exceptions:** Describe return values and any exceptions that might be raised.
+   - **Usage Examples:** Include examples for key functions to illustrate their usage.
+
+3. **Critical Implementation Notes:**
+   - **Approach Justification:** Explain why certain approaches were taken in the code.
+   - **Security Considerations:** Highlight important security considerations, especially for sensitive areas like SSO.
+   - **Compatibility:** Note any backward compatibility mechanisms and version compatibility (e.g., Pydantic v1/v2 support).
+   - **Error Handling:** Describe error handling strategies employed in the code.
+
+4. **Warnings and Considerations:**
+   - **Non-Changeable Code:** Clearly indicate any code that should not be changed without careful consideration, such as security-critical components.
+   - **Fallback Mechanisms:** Explain any fallback mechanisms in place, particularly for authentication.
+   - **Parameter Merging:** Describe rules for parameter merging precedence.
+
+By following these guidelines, the documentation will be comprehensive and helpful for developers who need to maintain or extend the code in the future.

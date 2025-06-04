@@ -1,0 +1,73 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+---
+rule-status: wip
+---
+
+# Cursor Rules Index & Fetch Guidance
+
+This index provides guidance on **when to fetch each rule** using the `fetch_rules` tool. The rule descriptions below are just summaries - always fetch the full rule when the trigger conditions are met.
+
+## 🚨 CRITICAL: Always Fetch Before Acting
+
+These rules contain specific procedures that **MUST** be fetched and read before taking action:
+
+### Task Magic System Rules
+- **`.task-magic/tasks`** - 🚨 **FETCH BEFORE**: Creating, updating, or working with any task files in `.ai/tasks/` or `.ai/TASKS.md`
+  - Contains required procedures for timestamps (date command), task IDs, file naming, YAML format
+  - Contains workflow procedures for status updates and dependencies
+- **`.task-magic/plan`** - 🚨 **FETCH BEFORE**: Creating or updating PRD files in `.ai/plans/`
+- **`.task-magic/memory`** - 🚨 **FETCH BEFORE**: Archiving tasks or working with `.ai/memory/`
+- **`.task-magic/expand`** - 🚨 **FETCH BEFORE**: Determining if a task should be broken into sub-tasks
+
+### Critical Development Rules
+- **`general/ai_human_collaboration_protocol`** - 🚨 **FETCH BEFORE**: Starting any significant user request
+- **`python/testing`** - 🚨 **FETCH BEFORE**: Writing or running tests
+- **`git/git_best_practices`** - 🚨 **FETCH BEFORE**: Making git commits or branch operations
+
+## 📋 Fetch When Relevant Context Needed
+
+These rules provide important context and should be fetched when their domain is relevant:
+
+### Code Quality & Style
+- **`python/code_style`** - **FETCH WHEN**: Writing or reviewing Python code
+- **`document/add-comments`** - **FETCH WHEN**: Adding documentation or comments to code
+- **`general/development_workflow`** - **FETCH WHEN**: Working on development tasks
+- **`general/logging`** - **FETCH WHEN**: Implementing logging or error handling
+
+### Project-Specific Context
+- **`projects/mastermind`** - **FETCH WHEN**: Working on Mastermind project features
+- **`linear/linear`** - **FETCH WHEN**: Creating, updating, or working with Linear issues
+- **`stack/benchling`** - **FETCH WHEN**: Working with Benchling API integration
+- **`stack/excel`** - **FETCH WHEN**: Processing Excel files or data extraction
+
+### Documentation & Reporting
+- **`general/prd`** - **FETCH WHEN**: Writing Product Requirements Documents
+- **`general/reports`** - **FETCH WHEN**: Creating progress reports (RPT)
+- **`general/mermaid`** - **FETCH WHEN**: Creating diagrams or flowcharts
+- **`general/checkpoint`** - **FETCH WHEN**: User requests a checkpoint
+
+### Infrastructure & Deployment
+- **`general/environment`** - **FETCH WHEN**: Working with environment configuration
+- **`general/performance_deployment`** - **FETCH WHEN**: Optimizing performance or deployment
+- **`general/security`** - **FETCH WHEN**: Implementing security features
+
+## 🔧 Utility Rules
+- **`create_cursor_rules`** - **FETCH WHEN**: Creating new rule files
+
+## ⚠️ Key Principle
+
+**When in doubt, fetch the rule!** It's better to read the complete procedure than to guess or assume. Many rules contain specific commands, formats, or procedures that must be followed exactly.
+
+## 🎯 Example Triggers
+
+- **Working with tasks?** → Fetch `.task-magic/tasks`
+- **Writing Python?** → Fetch `python/code_style` 
+- **Creating tests?** → Fetch `python/testing`
+- **Making git commits?** → Fetch `git/git_best_practices`
+- **User asks for checkpoint?** → Fetch `general/checkpoint`
+- **Working with Benchling?** → Fetch `stack/benchling`
+- **Creating documentation?** → Fetch `document/add-comments`

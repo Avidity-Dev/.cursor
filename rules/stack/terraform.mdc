@@ -1,0 +1,612 @@
+---
+description: 
+globs: **/*.tf,**/[Tt]erraform*/**
+alwaysApply: false
+---
+# Terraform Best Practices
+
+<!-- TABLE OF CONTENTS -->
+- [Core Concepts](mdc:#core-concepts)
+- [Project Structure](mdc:#project-structure)
+- [State Management](mdc:#state-management)
+- [Security Practices](mdc:#security-practices)
+- [Module Design](mdc:#module-design)
+- [CI/CD Integration](mdc:#cicd-integration)
+- [Cloud Provider Patterns](mdc:#cloud-provider-patterns)
+- [Testing and Validation](mdc:#testing-and-validation)
+- [Documentation Standards](mdc:#documentation-standards)
+
+## Core Concepts
+
+Terraform is an Infrastructure as Code (IaC) tool that enables declarative resource management across multiple cloud providers.
+
+### Essential Elements
+
+- **Providers**: Plugins for interacting with APIs (AWS, Azure, GCP, Snowflake, etc.)
+- **Resources**: Manageable infrastructure components
+- **Data Sources**: Read-only references to existing infrastructure
+- **Variables**: Parameterization for flexible configuration
+- **Outputs**: Exposed values from infrastructure creation
+- **Modules**: Reusable, encapsulated infrastructure components
+- **State**: Record of managed infrastructure and resource metadata
+
+### Workflow
+
+The standard Terraform workflow follows:
+
+1. `terraform init`: Initialize working directory, download providers
+2. `terraform plan`: Preview changes before applying
+3. `terraform apply`: Create or update infrastructure
+4. `terraform destroy`: Remove managed infrastructure
+
+## Project Structure
+
+Organize your Terraform code using this recommended structure:
+
+```
+terraform-project/
+├── README.md                  # Project documentation
+├── main.tf                    # Main resources
+├── variables.tf               # Input variables
+├── outputs.tf                 # Output values
+├── versions.tf                # Required providers and versions
+├── backend.tf                 # State configuration
+├── locals.tf                  # Local values
+├── data.tf                    # Data sources
+├── modules/                   # Reusable modules
+│   ├── networking/
+│   ├── compute/
+│   └── database/
+└── environments/              # Environment configurations
+    ├── dev/
+    ├── staging/
+    └── prod/
+```
+
+### Best Practices
+
+1. **Separation of Concerns**: Group related resources in dedicated files
+2. **DRY Principle**: Use modules to avoid repetition
+3. **Consistent Naming**: Follow a naming convention for all resources
+4. **Minimal Root Module**: Keep the root module simple, delegate to child modules
+5. **Environment Isolation**: Separate environments with different state files
+
+## State Management
+
+Terraform state is a critical component that maps real-world resources to your configuration.
+
+### Remote State
+
+**Always use remote state in team environments:**
+
+```hcl
+terraform {
+  backend "azurerm" {
+    resource_group_name  = "tfstate-rg"
+    storage_account_name = "companystate"
+    container_name       = "tfstate"
+    key                  = "project/environment.tfstate"
+  }
+}
+```
+
+### State Locking
+
+State locking prevents concurrent modifications that could corrupt state:
+
+- **Azure**: Uses blob leases for locking
+- **AWS S3**: Requires DynamoDB table for locking
+- **GCP**: Uses Cloud Storage object locking
+
+Example with AWS:
+
+```hcl
+terraform {
+  backend "s3" {
+    bucket         = "terraform-state-bucket"
+    key            = "project/environment.tfstate"
+    region         = "us-west-2"
+    dynamodb_table = "terraform-locks"
+    encrypt        = true
+  }
+}
+```
+
+### State Security
+
+- Enable encryption at rest
+- Restrict access to state files
+- Never commit state files to version control
+- Consider using Terraform Cloud for managed state
+
+## Security Practices
+
+### Sensitive Data Management
+
+1. **Never hardcode credentials** in configuration files:
+
+```hcl
+# BAD
+provider "aws" {
+  access_key = "AKIAIOSFODNN7EXAMPLE"
+  secret_key = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
+}
+
+# GOOD
+provider "aws" {}  # Use environment variables or IAM roles
+```
+
+2. **Use variables with sensitive flag**:
+
+```hcl
+variable "database_password" {
+  description = "Password for database"
+  type        = string
+  sensitive   = true  # Masks in CLI output
+}
+```
+
+3. **Store secrets in dedicated systems**:
+   - AWS Secrets Manager
+   - Azure Key Vault
+   - HashiCorp Vault
+   - Environment variables
+
+### Service Principal Management
+
+For Azure deployments:
+
+1. **Create with least privilege**:
+
+```bash
+az ad sp create-for-rbac --name "terraform-sp" --role Contributor --scopes /subscriptions/YOUR_SUBSCRIPTION_ID
+```
+
+2. **Rotate credentials regularly**:
+
+```bash
+az ad sp credential reset --name "terraform-sp"
+```
+
+3. **CI/CD Integration**:
+   - Store credentials in CI/CD secret storage
+   - Use environment variables in pipelines
+   - Consider managed identities where available
+
+4. **Secure Credential Workflow**:
+
+```hcl
+provider "azurerm" {
+  features {}
+  
+  # Credentials passed via environment variables:
+  # ARM_CLIENT_ID
+  # ARM_CLIENT_SECRET
+  # ARM_TENANT_ID
+  # ARM_SUBSCRIPTION_ID
+}
+```
+
+## Module Design
+
+### Module Structure
+
+Every module should follow this structure:
+
+```
+modules/database/
+├── README.md          # Module documentation
+├── main.tf            # Main resources
+├── variables.tf       # Input variables with validations
+├── outputs.tf         # Output values
+├── versions.tf        # Required providers
+└── examples/          # Example implementations
+```
+
+### Interface Design
+
+1. **Input Validation**:
+
+```hcl
+variable "instance_type" {
+  description = "EC2 instance type"
+  type        = string
+  default     = "t3.micro"
+  
+  validation {
+    condition     = contains(["t3.micro", "t3.small", "t3.medium"], var.instance_type)
+    error_message = "Allowed values: t3.micro, t3.small, or t3.medium."
+  }
+}
+```
+
+2. **Meaningful Outputs**:
+
+```hcl
+output "instance_ip" {
+  description = "Public IP address of the instance"
+  value       = aws_instance.this.public_ip
+}
+```
+
+3. **Module Versioning**:
+
+```hcl
+module "vpc" {
+  source  = "terraform-aws-modules/vpc/aws"
+  version = "3.19.0"  # Pin to specific version
+  
+  # module inputs...
+}
+```
+
+## CI/CD Integration
+
+### Pipeline Configuration
+
+Implement a CI/CD workflow with:
+
+1. **Automated Formatting and Validation**:
+   - `terraform fmt -check -recursive`
+   - `terraform validate`
+   - `tflint`
+
+2. **Security Scanning**:
+   - `tfsec`
+   - `checkov`
+   - `terrascan`
+
+3. **Cost Estimation**:
+   - `infracost`
+
+4. **Plan and Apply Stages**:
+   - Generate plans in PR/MR
+   - Apply only after approval
+
+### GitHub Actions Example
+
+```yaml
+name: Terraform
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: hashicorp/setup-terraform@v2
+      
+      - name: Format Check
+        run: terraform fmt -check -recursive
+        
+      - name: Init
+        run: terraform init -backend=false
+        
+      - name: Validate
+        run: terraform validate
+
+  security:
+    needs: validate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Run tfsec
+        uses: aquasecurity/tfsec-action@v1.0.0
+
+  plan:
+    if: github.event_name == 'pull_request'
+    needs: [validate, security]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: hashicorp/setup-terraform@v2
+      
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-west-2
+          
+      - name: Terraform Init
+        run: terraform init
+        
+      - name: Terraform Plan
+        run: terraform plan -out=tfplan
+        
+      - name: Upload Plan
+        uses: actions/upload-artifact@v3
+        with:
+          name: tfplan
+          path: tfplan
+          
+  apply:
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    needs: [validate, security]
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v3
+      - uses: hashicorp/setup-terraform@v2
+      
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-west-2
+          
+      - name: Terraform Init
+        run: terraform init
+        
+      - name: Terraform Apply
+        run: terraform apply -auto-approve
+```
+
+## Cloud Provider Patterns
+
+### AWS
+
+1. **Resource Naming Convention**:
+```hcl
+resource "aws_s3_bucket" "this" {
+  bucket = "${var.project}-${var.environment}-${var.name}"
+  # ...
+}
+```
+
+2. **Tagging Strategy**:
+```hcl
+locals {
+  common_tags = {
+    Project     = var.project
+    Environment = var.environment
+    Owner       = var.owner
+    ManagedBy   = "Terraform"
+  }
+}
+
+resource "aws_instance" "this" {
+  # ...
+  tags = merge(local.common_tags, {
+    Name = "${var.project}-${var.environment}-instance"
+  })
+}
+```
+
+### Azure
+
+1. **Naming Convention**:
+```hcl
+resource "azurerm_resource_group" "this" {
+  name     = "rg-${var.project}-${var.environment}"
+  location = var.location
+  # ...
+}
+```
+
+2. **Resource Locking**:
+```hcl
+resource "azurerm_management_lock" "this" {
+  name       = "lock-${var.project}-${var.environment}"
+  scope      = azurerm_resource_group.this.id
+  lock_level = "CanNotDelete"
+  notes      = "Locked to prevent accidental deletion"
+}
+```
+
+### Multi-Cloud
+
+1. **Provider Configuration**:
+```hcl
+provider "aws" {
+  region = "us-west-2"
+  alias  = "west"
+}
+
+provider "aws" {
+  region = "us-east-1"
+  alias  = "east"
+}
+
+provider "azurerm" {
+  features {}
+  alias = "main"
+}
+```
+
+2. **Resource Distribution**:
+```hcl
+module "aws_west" {
+  source = "./modules/aws"
+  providers = {
+    aws = aws.west
+  }
+  # ...
+}
+
+module "azure_main" {
+  source = "./modules/azure"
+  providers = {
+    azurerm = azurerm.main
+  }
+  # ...
+}
+```
+
+## Testing and Validation
+
+### Unit Testing
+
+Use Terratest for testing modules:
+
+```go
+package test
+
+import (
+  "testing"
+  "github.com/gruntwork-io/terratest/modules/terraform"
+  "github.com/stretchr/testify/assert"
+)
+
+func TestTerraformAwsExample(t *testing.T) {
+  terraformOptions := terraform.WithDefaultRetryableErrors(t, &terraform.Options{
+    TerraformDir: "../examples/aws-instance",
+    Vars: map[string]interface{}{
+      "instance_type": "t3.micro",
+    },
+  })
+
+  defer terraform.Destroy(t, terraformOptions)
+  terraform.InitAndApply(t, terraformOptions)
+
+  instanceID := terraform.Output(t, terraformOptions, "instance_id")
+  assert.NotEmpty(t, instanceID)
+}
+```
+
+### Static Analysis
+
+Use pre-commit hooks for consistency:
+
+```yaml
+# .pre-commit-config.yaml
+repos:
+- repo: https://github.com/antonbabenko/pre-commit-terraform
+  rev: v1.77.1
+  hooks:
+    - id: terraform_fmt
+    - id: terraform_validate
+    - id: terraform_docs
+    - id: terraform_tflint
+    - id: terraform_tfsec
+```
+
+## Documentation Standards
+
+### Module Documentation
+
+Every module should have a README.md with:
+
+1. **Overview**: Purpose and functionality
+2. **Usage Example**: Basic implementation
+3. **Input Variables**: All required and optional inputs
+4. **Outputs**: All exported values
+5. **Requirements**: Provider versions, Terraform versions
+6. **Resources Created**: List of resources the module manages
+
+Use `terraform-docs` to generate documentation:
+
+```hcl
+/**
+ * # S3 Website Module
+ *
+ * This module creates an S3 bucket configured for static website hosting.
+ *
+ * ## Features
+ * 
+ * - Static website hosting
+ * - Configurable index/error documents
+ * - Optional CloudFront distribution
+ *
+ * ## Usage
+ *
+ * ```hcl
+ * module "website" {
+ *   source = "./modules/s3-website"
+ *   
+ *   bucket_name = "my-website-bucket"
+ *   index_document = "index.html"
+ *   error_document = "error.html"
+ * }
+ * ```
+ */
+
+variable "bucket_name" {
+  description = "Name of the S3 bucket to create"
+  type        = string
+}
+```
+
+### Diagrams
+
+Include architecture diagrams for complex modules:
+
+```markdown
+## Architecture
+
+![Architecture Diagram](mdc:diagrams/architecture.png)
+
+This module creates the following resources:
+1. VPC with public and private subnets
+2. NAT Gateway for outbound traffic
+3. Application Load Balancer
+4. Auto Scaling Group with EC2 instances
+5. RDS database in private subnet
+```
+
+## Drift Detection and Compliance
+
+### Detect Configuration Drift
+
+Periodically check for drift in your environments:
+
+```bash
+terraform plan -refresh-only
+```
+
+### Policy as Code
+
+Implement policy checks with tools like Open Policy Agent, Sentinel, or AWS CloudFormation Guard.
+
+Example Sentinel policy:
+
+```hcl
+import "tfplan"
+
+# Require specific instance types
+allowed_types = ["t3.small", "t3.medium", "t3.large"]
+
+# Rule to restrict EC2 instance types
+ec2_instance_type_allowed = rule {
+  all tfplan.resources.aws_instance as _, instances {
+    all instances as _, r {
+      r.applied.instance_type in allowed_types
+    }
+  }
+}
+
+main = rule {
+  ec2_instance_type_allowed
+}
+```
+
+## Common Pitfalls and Mitigations
+
+1. **Count vs For_each**:
+   - Prefer `for_each` over `count` for resources with unique identifiers to prevent reordering issues
+
+2. **State Corruption**:
+   - Always use locking with remote state
+   - Create regular state backups
+
+3. **Dependency Cycles**:
+   - Use `depends_on` to make implicit dependencies explicit
+   - Break circular dependencies with intermediate resources
+
+4. **Provider Version Conflicts**:
+   - Pin provider versions in versions.tf
+   - Use dependency lockfiles
+
+5. **Large State Files**:
+   - Split environments into separate states
+   - Use `-target` flag judiciously for large operations
+
+6. **Handling Secrets**:
+   - Never store secrets in state without encryption
+   - Use dynamic providers for secrets management

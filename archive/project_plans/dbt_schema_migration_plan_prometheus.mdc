@@ -1,0 +1,254 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# DBT Schema Migration Plan: raw/silver/gold/marts to ingest/conform/mdm/present
+
+NEVER EXECUTED
+
+## Executive Summary
+This rule provides a detailed plan for migrating your dbt project's schema structure in Snowflake. It covers the necessary dbt configuration changes, a robust method for cloning existing table data using a dbt macro, and a step-by-step process to ensure a smooth transition with minimal risk. The goal is to evolve your data warehouse layers to new standardized names: `raw` to `ingest`, `silver` to `conform`, and consolidating `gold` and `marts` into a single `present` layer, while `mdm` remains unchanged.
+
+## Migration Scope
+The following schema name changes are planned:
+1.  **`raw`** (old) -> **`ingest`** (new)
+2.  **`silver`** (old) -> **`conform`** (new)
+3.  **`mdm`** (old) -> **`mdm`** (new - no change in name, but configurations referencing other layers might need updates)
+4.  **`gold`** (old) -> **`present`** (new - consolidated layer)
+5.  **`marts`** (old) -> **`present`** (new - consolidated layer)
+
+```mermaid
+graph LR
+    A[Source Systems] --> Ingest_Layer;
+    Ingest_Layer --> Conform_Layer;
+    Conform_Layer --> MDM_Layer;
+    Conform_Layer --> Present_Layer;
+    MDM_Layer --> Present_Layer;
+    Present_Layer --> F[BI Tools / Applications];
+
+    %% Styling
+    classDef warehouseLayer fill:#D6EAF8,stroke:#2980B9,stroke-width:2px,color:#2C3E50,font-weight:bold;
+    class Ingest_Layer,Conform_Layer,MDM_Layer,Present_Layer warehouseLayer;
+
+    classDef externalSystem fill:#E8DAEF,stroke:#8E44AD,stroke-width:2px,color:#2C3E50;
+    class A,F externalSystem;
+```
+
+## Pre-Migration Checklist
+Before initiating the migration, ensure the following are completed:
+1.  **Comprehensive Snowflake Backup:** Verify that your Snowflake data is backed up. Utilize Snowflake's Time Travel feature or take explicit backups if necessary.
+2.  **Test Environment:** Perform this entire migration process in a dedicated development or staging environment that mirrors production as closely as possible.
+3.  **Communication Plan:** Inform relevant stakeholders (e.g., data consumers, BI teams) about the planned migration and any potential (brief) impacts or changes they need to be aware of.
+4.  **Review dbt Project:** Identify all models, macros, and configurations that reference the schemas being changed.
+
+## Step 1: Data Migration (Cloning Tables in Snowflake)
+Before altering dbt configurations, you must copy data from your existing schemas to the new target schemas. We'll use Snowflake's `CLONE` feature via a dbt macro for efficiency (zero-copy cloning for tables).
+
+### DBT Macro: `clone_schema_tables`
+Place the following macro code in your dbt project, typically in a file like `macros/admin_operations/clone_schema_tables.sql`:
+
+```sql
+{% macro clone_schema_tables(source_schema, target_schema, database_name=target.database, dry_run=true) %}
+    {# Ensure source_schema and target_schema are provided #}
+    {% if not source_schema or not target_schema %}
+        {{ exceptions.raise_compiler_error("Both source_schema and target_schema must be provided.") }}
+    {% endif %}
+
+    {% if source_schema == target_schema %}
+        {{ exceptions.raise_compiler_error("Source schema and target schema cannot be the same.") }}
+    {% endif %}
+
+    {% if execute %}
+        {{ log("Starting schema clone operation from " ~ database_name ~ "." ~ source_schema ~ " to " ~ database_name ~ "." ~ target_schema ~ ". Dry run: " ~ dry_run, info=true) }}
+
+        {# 1. Ensure the target schema exists #}
+        {% set ensure_target_schema_sql %}
+            CREATE SCHEMA IF NOT EXISTS {{ adapter.quote(database_name) }}.{{ adapter.quote(target_schema) }};
+        {% endset %}
+        
+        {{ log("SQL to ensure target schema: " ~ ensure_target_schema_sql, info=true) }}
+        {% if not dry_run %}
+            {% do run_query(ensure_target_schema_sql) %}
+            {{ log("Ensured target schema " ~ database_name ~ "." ~ target_schema ~ " exists.", info=true) }}
+        {% else %}
+            {{ log("DRY RUN: Would ensure target schema " ~ database_name ~ "." ~ target_schema ~ " exists.", info=true) }}
+        {% endif %}
+
+        {# 2. Get all 'BASE TABLE' objects from the source schema #}
+        {% set list_tables_sql %}
+            SELECT TABLE_NAME
+            FROM {{ adapter.quote(database_name) }}.INFORMATION_SCHEMA.TABLES
+            WHERE TABLE_SCHEMA = '{{ source_schema | upper }}'
+              AND TABLE_TYPE = 'BASE TABLE';
+        {% endset %}
+
+        {{ log("Fetching tables from " ~ database_name ~ "." ~ source_schema ~ " using SQL: " ~ list_tables_sql, info=true) }}
+        {% set tables_to_clone = run_query(list_tables_sql) %}
+
+        {% if not tables_to_clone %}
+            {{ log("No 'BASE TABLE' type tables found in schema: " ~ database_name ~ "." ~ source_schema ~ ". Nothing to clone.", warning=true) }}
+            {{ return("") }}
+        {% endif %}
+
+        {{ log("Found " ~ tables_to_clone | length ~ " table(s) to clone.", info=true) }}
+
+        {# 3. For each table, generate and execute the CLONE command #}
+        {% for row in tables_to_clone %}
+            {% set table_name = row['TABLE_NAME'] %}
+            {% set source_relation_str = adapter.quote(database_name) ~ "." ~ adapter.quote(source_schema) ~ "." ~ adapter.quote(table_name) %}
+            {% set target_relation_str = adapter.quote(database_name) ~ "." ~ adapter.quote(target_schema) ~ "." ~ adapter.quote(table_name) %}
+            
+            {% set clone_sql %}
+                CREATE OR REPLACE TABLE {{ target_relation_str }}
+                CLONE {{ source_relation_str }};
+            {% endset %}
+            
+            {{ log("SQL to clone " ~ table_name ~ ": " ~ clone_sql, info=true) }}
+
+            {% if not dry_run %}
+                {% set clone_status = run_query(clone_sql) %}
+                {{ log("Successfully cloned " ~ source_relation_str ~ " to " ~ target_relation_str, info=true) }}
+            {% else %}
+                {{ log("DRY RUN: Would clone " ~ source_relation_str ~ " to " ~ target_relation_str, info=true) }}
+            {% endif %}
+        {% endfor %}
+        
+        {{ log("Schema cloning process finished. Dry run: " ~ dry_run, info=true) }}
+    {% else %}
+        {{ log("Cannot execute clone_schema_tables macro during parsing.", info=true) }}
+    {% endif %}
+{% endmacro %}
+```
+
+### Running the Cloning Macro
+The dbt user will need appropriate permissions in Snowflake (USAGE on database and source schemas, SELECT on source tables, CREATE SCHEMA, CREATE TABLE on target schema/database).
+
+Execute the following `dbt run-operation` commands for each schema transformation. **Always perform a `dry_run=true` first.**
+
+1.  **Clone `raw` to `ingest`:**
+    *   Dry Run:
+        ```bash
+        dbt run-operation clone_schema_tables --args '''{"source_schema": "raw", "target_schema": "ingest", "dry_run": true}'''
+        ```
+    *   Actual Run:
+        ```bash
+        dbt run-operation clone_schema_tables --args '''{"source_schema": "raw", "target_schema": "ingest", "dry_run": false}'''
+        ```
+
+2.  **Clone `silver` to `conform`:**
+    *   Dry Run:
+        ```bash
+        dbt run-operation clone_schema_tables --args '''{"source_schema": "silver", "target_schema": "conform", "dry_run": true}'''
+        ```
+    *   Actual Run:
+        ```bash
+        dbt run-operation clone_schema_tables --args '''{"source_schema": "silver", "target_schema": "conform", "dry_run": false}'''
+        ```
+
+3.  **Clone `gold` to `present`:**
+    *   Dry Run:
+        ```bash
+        dbt run-operation clone_schema_tables --args '''{"source_schema": "gold", "target_schema": "present", "dry_run": true}'''
+        ```
+    *   Actual Run:
+        ```bash
+        dbt run-operation clone_schema_tables --args '''{"source_schema": "gold", "target_schema": "present", "dry_run": false}'''
+        ```
+
+4.  **Clone `marts` to `present`:**
+    *   Dry Run:
+        ```bash
+        dbt run-operation clone_schema_tables --args '''{"source_schema": "marts", "target_schema": "present", "dry_run": true}'''
+        ```
+    *   Actual Run:
+        ```bash
+        dbt run-operation clone_schema_tables --args '''{"source_schema": "marts", "target_schema": "present", "dry_run": false}'''
+        ```
+    *   **Note on `gold` & `marts` to `present`:** If a table exists in both `gold` and `marts` with the same name, the version from the schema cloned last (in this sequence, `marts`) will be the one present in `present.your_table_name` due to `CREATE OR REPLACE TABLE ... CLONE`. Ensure this behavior is intended or handle table name conflicts beforehand.
+
+## Step 2: Update dbt Project Configurations
+After data is cloned to the new schemas, update your dbt project.
+
+1.  **Modify `dbt_project.yml`:**
+    Adjust the schema configurations for your model paths. Example:
+    ```yaml
+    # dbt_project.yml
+    name: 'your_project_name_in_dbt_project_yml'
+    version: '1.0.0'
+    config-version: 2
+    profile: 'your_profile'
+
+    models:
+      your_project_name_in_dbt_project_yml: # This should be your project's name
+        # Example for models previously in 'raw' folder, now targeting 'ingest' schema
+        raw: # Or your folder name, e.g., 'ingest_models' if you rename folders
+          +schema: ingest
+          # ... other configurations for raw/ingest layer
+
+        # Example for models previously in 'silver' folder, now targeting 'conform' schema
+        silver: # Or your folder name, e.g., 'conform_models'
+          +schema: conform
+          # ... other configurations for silver/conform layer
+        
+        mdm:
+          +schema: mdm # Assuming 'mdm' schema name remains, but verify paths
+          # ... other configurations for mdm layer
+
+        # Example for models previously in 'gold' folder, now targeting 'present' schema
+        gold: # Or your folder name, e.g., 'present_models_from_gold'
+          +schema: present
+          # ... other configurations for models moving to 'present' layer
+        
+        # Example for models previously in 'marts' folder, now targeting 'present' schema
+        marts: # Or your folder name, e.g., 'present_models_from_marts'
+          +schema: present
+          # ... other configurations for models moving to 'present' layer
+    ```
+    *   **Consider Renaming Model Folders:** You might also want to rename your dbt model directories to align with the new schema names (e.g., `models/raw/` to `models/ingest/`). If you do, update the paths in `dbt_project.yml` accordingly.
+
+2.  **Update Model-Specific Configurations:**
+    Search for any model-specific schema configurations and update them:
+    ```sql
+    -- E.g., models/ingest/my_raw_model.sql
+    {{ config(
+        schema='ingest' -- Was potentially 'raw' or custom
+    ) }}
+    ```
+
+3.  **Review Macros and `ref()`/`source()` calls:** Ensure any custom macros generating schema names or explicit schema references in `ref` or `source` calls are updated.
+
+## Step 3: Run and Test dbt
+1.  **`dbt run`**: Execute a full `dbt run`. Dbt will now build models into the newly configured schemas (e.g., `ingest`, `conform`, `present`). Incremental models should pick up from the cloned tables.
+2.  **`dbt test`**: Run all your dbt tests to ensure data integrity and consistency.
+3.  **Manual Validation:** Perform spot checks and deeper validation of data in the new schemas. Compare row counts, critical values, etc., against the old schemas (if still available) or expected outcomes.
+
+## Step 4: Update Downstream Consumers
+1.  Identify all downstream systems (BI tools, dashboards, applications, direct queries) that consume data from the old schemas.
+2.  Update their connection settings or queries to point to the new schemas (`ingest`, `conform`, `mdm`, `present`).
+3.  Test these downstream systems thoroughly.
+
+## Step 5: Decommission Old Schemas (Cautiously)
+1.  **Waiting Period:** Do not immediately drop the old schemas (`raw`, `silver`, `gold`, `marts`). Keep them for a safe period (e.g., a few days or weeks) as a fallback.
+2.  **Final Backup Check:** Ensure your latest backups include the new schema structure and data.
+3.  **Drop Old Schemas:** Once fully confident and all consumers are migrated, you can drop the old schemas from Snowflake:
+    ```sql
+    DROP SCHEMA IF EXISTS raw;
+    DROP SCHEMA IF EXISTS silver;
+    DROP SCHEMA IF EXISTS gold;
+    DROP SCHEMA IF EXISTS marts;
+    ```
+
+## Lessons Learned & Key Takeaways
+This migration process highlights several important principles in managing data warehouses with dbt:
+
+1.  **Configuration is King (in dbt):** Your dbt project (`dbt_project.yml`, model configs) is the source of truth for *where dbt builds objects*. Changes to target schemas must be made here.
+2.  **dbt Doesn't Move Data:** Changing schema configurations in dbt tells it where to build *next time*. It does not automatically migrate existing data. Data migration is a separate, prerequisite step.
+3.  **Snowflake `CLONE` is Your Friend:** For migrating tables within Snowflake, `CLONE` is extremely efficient (zero-copy for tables), fast, and cost-effective. It's ideal for creating copies of tables in new schemas.
+4.  **Avoid Direct DDL for dbt-Managed Objects:** Directly renaming schemas or tables in Snowflake that dbt manages will break your dbt pipeline. Let dbt manage the DDL based on its configurations.
+5.  **Incremental Models Need History:** When changing schemas for incremental models, their historical data must exist in the new target location *before* `dbt run` is executed, otherwise they may perform an unintended full refresh (potentially losing historical data not present in the source anymore). Cloning handles this by making the full table available in the new location.
+6.  **`dry_run` is Essential:** For any operation that modifies your database structure or moves data, always use a `dry_run` or equivalent test mode first to understand the impact.
+7.  **Test Rigorously:** Test at each stage: macro execution, dbt runs, data validation, and downstream consumer updates.
+8.  **Backups Provide Safety:** Always ensure you have reliable backups before undertaking significant structural changes.
+
+By following this plan, you can execute your schema migration methodically and safely.

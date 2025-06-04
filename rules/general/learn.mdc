@@ -1,0 +1,8 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# Extract Learnings
+
+Whenever something is fixed, extract learnings/principles/guidelines from what was done and put that into a markdown file at `.dev/journal/learnings`. We want to keep track of all of our progress so we can avoid making the same mistakes over and over.

@@ -1,0 +1,33 @@
+---
+description:
+globs:
+alwaysApply: false
+---
+# Linear Guide - Document Purpose and Writing Approach
+
+## Purpose
+The [Linear Guide](mdc:Linear Guide) is an onboarding document for external contractors who currently use Jira but will be working with us in Linear. This is NOT primarily a migration guide, but rather a resource to help Jira-experienced users quickly become comfortable and productive in Linear for our new project.
+
+## Document Structure
+1. Welcome and introduction to Linear's philosophy
+2. Practical crash course focused on daily workflows
+3. Translation of Jira concepts to Linear equivalents
+4. Project-specific setup and productivity tips
+5. Appendices with additional resources and optional migration information
+
+## Writing Considerations
+- Tone: Friendly, confident, and reassuring for users uncomfortable with changing tools
+- Focus: Practical over theoretical, emphasizing what contractors need to know immediately
+- Format: Concise explanations with bullet points and tables for easy scanning
+- Context: Written with the understanding that contractors already know Jira but don't need to migrate existing projects
+- Migration info: Included as a bonus (Appendix B) should contractors want to use Linear for their own projects in the future
+
+## Key Sections
+- "Welcome! Working with Us in Linear": Establishes why we use Linear and its core principles
+- "Getting Started Quickly": Focuses on key concepts and workflows they'll use daily
+- "Bridging the Gap": Directly addresses translation from Jira concepts to Linear
+- "Practical Setup & Tips": Specific to our team's implementation of Linear
+- Optional appendices for additional learning and reference
+
+## Development Status
+This document is currently under development, with sections being revised and expanded to better serve our specific audience of contractors transitioning from Jira to Linear for our projects.

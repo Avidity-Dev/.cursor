@@ -1,0 +1,207 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# AI-Friendly Documentation Standards
+
+This rule provides specialized guidelines for creating documentation that is particularly effective for AI parsing and comprehension, enabling better AI assistance with code.
+
+## Key Principles
+
+1. **Structure and Consistency** - Use predictable formats and structures that are easy to parse
+2. **Explicit Context** - Provide clear relationships between components
+3. **Anchored References** - Use explicit references to other code elements
+4. **Design Rationale** - Document the "why" behind implementation choices
+5. **Type Information** - Include explicit types even in dynamically typed languages
+
+## AI-Specific Annotation Tags
+
+Use these lightweight tags to help AI tools parse intent without cluttering human readability:
+
+```python
+# AI_DOC: High-level rationale a model can quickly parse
+# AI_NOTE: Nuanced implementation detail for accurate AI refactoring
+# AI_CONTEXT: Broader system context about relationships
+# AI_WARN: Potential pitfalls or areas requiring special attention
+```
+
+Keep tags concise; they should complement, not replace, regular comments/docstrings.
+
+## Documentation Patterns for AI Comprehension
+
+### Module-Level
+
+Document module relationships and responsibilities:
+
+```python
+"""
+Module: user_service.py
+
+Purpose
+-------
+Manages user accounts and authentication.
+
+Dependencies
+-------
+- [database.py](mdc:src/database.py): For data persistence
+- [auth.py](mdc:src/auth.py): For authentication mechanisms
+
+Architecture Context
+-------
+This module is part of the service layer, sitting between
+the API controllers and data access layer.
+"""
+```
+
+### Function/Method Level
+
+Enhance function documentation with invariants and edge cases:
+
+```python
+def transfer_funds(source_account: str, target_account: str, amount: float) -> bool:
+    """Transfer funds between accounts.
+    
+    Parameters
+    ----------
+    source_account : str
+        Account ID to transfer from
+    target_account : str
+        Account ID to transfer to
+    amount : float
+        Amount to transfer (must be positive)
+        
+    Returns
+    -------
+    bool
+        True if transfer successful, False otherwise
+        
+    Raises
+    ------
+    InsufficientFundsError
+        If source account has insufficient balance
+    AccountNotFoundError
+        If either account doesn't exist
+        
+    Invariants
+    ----------
+    - Total money in system remains the same before and after transfer
+    - Transaction is atomic (either completes fully or fails completely)
+    
+    Edge Cases
+    ----------
+    - Zero amount transfers are allowed but will return immediately
+    - Self-transfers (same source and target) are optimized to a no-op
+    """
+```
+
+### Variable and Data Structure Documentation
+
+Document data structures and their usage patterns:
+
+```python
+# AI_CONTEXT: User settings dictionary structure, keys are determined dynamically
+# from user preferences database table, so the exact keys vary by user
+user_settings = {
+    "theme": "dark",          # String: display theme name
+    "notifications": True,    # Boolean: whether notifications are enabled
+    "retry_count": 3          # Integer: number of automatic retries
+}
+```
+
+### Complex Algorithm Documentation
+
+Document algorithmic steps and optimization considerations:
+
+```python
+# AI_DOC: Custom caching implementation with LRU expiration
+# Performance characteristics:
+# - O(1) lookup time
+# - O(log n) insertion time due to heap maintenance
+# - Space complexity: O(n) where n is cache capacity
+#
+# Key optimization: Uses weak references to prevent memory leaks
+# when cached objects are no longer referenced elsewhere
+```
+
+## Before/After Examples
+
+### ❌ Non-AI-Friendly Documentation:
+
+```python
+def process_data(data):
+    """Process the data."""
+    # Check if already processed
+    if data.processed:
+        return data
+    
+    # Do the processing
+    result = data.content.split(',')
+    for i in range(len(result)):
+        result[i] = result[i].strip()
+    
+    # Mark as processed
+    data.processed = True
+    return data
+```
+
+### ✅ AI-Friendly Documentation:
+
+```python
+def process_data(data: DataObject) -> DataObject:
+    """Process raw data by splitting and cleaning CSV content.
+    
+    Parameters
+    ----------
+    data : DataObject
+        The data object containing a `content` field with comma-separated values
+        and a `processed` flag
+        
+    Returns
+    -------
+    DataObject
+        The same object with processed=True and transformed content
+        
+    Notes
+    -----
+    This is idempotent - calling multiple times on the same object
+    will only process it once.
+    
+    See Also
+    --------
+    DataObject : The class definition
+    validate_data : Should be called before this function
+    """
+    # AI_CONTEXT: Early return for idempotence - prevents duplicate processing
+    if data.processed:
+        return data
+    
+    # AI_DOC: CSV parsing with whitespace normalization
+    result = data.content.split(',')
+    for i in range(len(result)):
+        result[i] = result[i].strip()
+    
+    data.processed = True
+    return data
+```
+
+## Implementation Checklist
+
+Use this checklist when writing AI-friendly documentation:
+
+- [ ] Added structured docstrings with type information
+- [ ] Documented dependencies and relationships between components
+- [ ] Included invariants and edge cases
+- [ ] Used AI annotation tags for important context
+- [ ] Provided "why" explanations for non-obvious decisions
+- [ ] Included references to related code components
+- [ ] Added performance and complexity characteristics where relevant
+
+## Key Benefits
+
+1. **Improved Autocompletion**: AI tools can provide more accurate code completion suggestions
+2. **Better Refactoring**: AI understands code context, constraints, and edge cases
+3. **More Accurate Bug Detection**: AI can reason about invariants and expected behavior
+4. **Enhanced Knowledge Transfer**: AI can learn and apply domain-specific patterns
+
+See also: [Documentation Standards](mdc:.cursor/rules/general/documentation.mdc) for broader documentation guidelines.

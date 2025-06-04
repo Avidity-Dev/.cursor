@@ -1,0 +1,107 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+can you add a little more detail about the issues that we still have to overcome as you see them? be more detailed about the errors. why do you think this is all happening fundamentally? is there something about our architecture that is not wired up correctly or is this an issue with how the tests are written?
+
+think like a master software architect with many years of experience. don't write any code, i just want your thought process. how should be proceed with this problem?
+
+this prompt with architect mode produced the following output.
+
+
+# [ARCHITECT MODE ENGAGED]
+
+## Root Cause Analysis: Configuration Testing Challenges
+
+The issues we're encountering are characteristic of testing singleton patterns in a production codebase. Let me provide a detailed architectural analysis:
+
+### Fundamental Architectural Issues
+
+1. **Singleton Global State Management**
+
+   The singleton pattern creates a fundamental tension with unit testing's need for isolation. Our `Config` class is designed to be instantiated once at module import time (`config = Config()` at module scope). This means several things:
+   
+   - Test order becomes significant - the first test to import the module sets the singleton state
+   - Mock patches applied after import don't affect the already-instantiated singleton
+   - The singleton retains real system state (file reads, env vars) rather than test fixtures
+
+2. **Python Module System Side Effects**
+
+   Python's module caching mechanism (`sys.modules`) preserves imported modules between test runs. The `Config` singleton is instantiated during the first import and then cached. Our tests are running against this pre-initialized singleton rather than a fresh instance with our test mocks.
+
+   This explains why our inspection script (run in isolation) showed properly functioning legacy accessors, while our tests showed `MagicMock` objects - either:
+   - Another test had already patched these accessors
+   - A pytest plugin/fixture was globally patching them
+
+3. **Incomplete Mock Boundaries**
+
+   The `_load_config()` method reads from filesystem and environment variables during initial import. If our mocks aren't in place *before* this happens, the singleton loads real configuration rather than test values.
+
+### Specific Error Patterns
+
+1. **MagicMock Legacy Accessors**: 
+   - Error: `assert isinstance(config.snowflake_account, str)` failing with `MagicMock`
+   - Root cause: The accessors were patched by another test or pytest setup
+   - Evidence: The same code running outside pytest shows strings, not mocks
+
+2. **Hardcoded Configuration Values**:
+   - Error: `assert config.snowflake.account == "yaml-acc"` failing with `UHEZAWM-ZD80876`
+   - Root cause: The singleton loaded the real config.yaml from disk before our patches took effect
+   - Evidence: All tests consistently show the same production values, not our mock values
+
+3. **Module Reloading Ineffectiveness**:
+   - Root cause: Even with `del sys.modules[...]`, module dependencies or circular imports may prevent complete reinitialization
+   - Evidence: The patterns persisted even with module reloading attempts
+
+### Architectural Recommendations
+
+1. **Design for Testability**:
+   - Refactor the singleton pattern to allow explicit initialization:
+   ```python
+   # Instead of auto-instantiation at import
+   config = Config() # At module scope
+   
+   # Allow manual initialization 
+   config = None # At module scope
+   def get_config():
+       global config
+       if config is None:
+           config = Config()
+       return config
+   ```
+
+2. **Dependency Injection Approach**:
+   - Pass the configuration as a dependency to components that need it
+   - Test with mock config instances rather than patching the real singleton
+   - This decouples components from the global state
+
+3. **Comprehensive Test Fixtures**:
+   - Create a proper pytest fixture that completely resets the module environment
+   - Use the `monkeypatch` fixture to intercept imports and return controlled instances
+   - Apply all mocks *before* the singleton is instantiated
+
+4. **Alternative Testing Strategy**:
+   - Don't fight the singleton - treat it as an integration point
+   - Test components that use the config in isolation by injecting mock config objects
+   - Have a small set of integration tests that verify the real config can load and behave correctly
+
+### Recommended Path Forward
+
+For this specific project, given we're testing an existing implementation, I suggest:
+
+1. **Split Test Approaches**:
+   - Create "structural verification" tests that just confirm the config has the right properties and methods
+   - Create "behavior verification" tests with comprehensive mocking to verify specific behaviors
+   - Create integration tests to validate the real config loads correctly
+
+2. **Improve Module Mocking**:
+   - Use the `unittest.mock.patch.dict(sys.modules, ...)` approach to replace the entire module
+   - Create a test double for the Config class that allows controlled testing
+   - Set up all mocks *before* any imports happen
+
+3. **Consider Design Feedback**:
+   - Document the testing challenges as feedback for future design decisions
+   - Suggest design alternatives that maintain the benefits of singletons while improving testability
+
+The fundamental issue is that our singleton implementation prioritized simplicity and global access over testability. This is a common trade-off, and there's no perfect solution for testing existing singletons. Instead, we need to adapt our testing strategy to work around these architectural constraints.

@@ -1,0 +1,81 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# PnP PowerShell Script Guidance
+
+This rule provides context for working with PowerShell scripts that utilize the `PnP.PowerShell` module within this repository, specifically [scripts/download_files.ps1](mdc:scripts/download_files.ps1).
+
+## Script Purpose
+
+The `download_files.ps1` script is designed to connect to a specified SharePoint Online folder URL and download all Excel files recursively to a local target directory.
+
+## Key Components
+
+- **PnP.PowerShell Module:** Used for SharePoint Online interaction (`Connect-PnPOnline`, `Get-PnPFolderItem`, `Get-PnPFile`). Ensure the module is installed and up-to-date (`Update-Module PnP.PowerShell`).
+- **Authentication:** The script supports both interactive (`-Interactive`) and device code flow (`-DeviceLogin`) authentication via `Connect-PnPOnline`. Device login (`$DeviceLogin = $true`) might be necessary in environments where interactive pop-ups fail.
+- **URL Parsing:** The script parses the input SharePoint URL to derive the Site URL and relative folder path.
+- **File Filtering:** Downloads only files with Excel extensions (`.xlsx`, `.xlsm`, `.xlsb`, `.xls`).
+- **Local Mirroring:** Recreates the SharePoint folder structure locally within the `$TargetPath`.
+
+## Authentication Requirements (Post-September 2024)
+
+- **Custom App Registration Required:** As of September 9, 2024, Microsoft retired the default PnP Management Shell Azure AD app. All PnP.PowerShell scripts now require:
+  - A custom Entra ID (Azure AD) app registration 
+  - Explicit `-Tenant` and `-ClientId` parameters for all `Connect-PnPOnline` calls
+
+### Setting Up Required Authentication
+
+1. **Register an App** (one-time setup):
+   ```powershell
+   Register-PnPEntraIDAppForInteractiveLogin -ApplicationName "PnP-AvidityRnD" -Tenant aviditybio.onmicrosoft.com
+   ```
+   This command will provide a ClientId and guide you through consent steps.
+
+2. **Enable Device Code Flow**:
+   - Go to Entra ID Portal → App registrations → find your app
+   - Navigate to Authentication tab
+   - Check "Allow public client flows" (required for `-DeviceLogin`)
+
+3. **Update Scripts**:
+   ```powershell
+   # Add these variables to your configuration section
+   $Tenant   = "aviditybio.onmicrosoft.com"
+   $ClientId = "your-client-id-from-registration"
+   
+   # Then modify the Connect-PnPOnline call
+   Connect-PnPOnline -Url $siteUrl -DeviceLogin -Tenant $Tenant -ClientId $ClientId -WarningAction Ignore
+   ```
+
+4. **Alternative: Environment Variable**:
+   ```powershell
+   # Set once (Windows)
+   setx ENTRAID_APP_ID $ClientId
+   
+   # Set once (macOS/Linux)
+   export ENTRAID_APP_ID=$ClientId
+   
+   # Then PnP.PowerShell will use it automatically (still need -Tenant parameter)
+   Connect-PnPOnline -Url $siteUrl -DeviceLogin -Tenant $Tenant -WarningAction Ignore
+   ```
+
+### Minimum Required Permissions
+
+For the registered app, you'll need:
+- Microsoft Graph → Sites.Read.All (for reading)
+- SharePoint → AllSites.FullControl (if writing/uploading)
+
+## Common Debugging Points
+
+- **Parser Errors:** PowerShell parsing can be sensitive. We encountered issues with:
+    - String interpolation (`"$($variable)"`): Using the `-f` format operator (`'string {0}' -f $variable`) or string concatenation (`+`) can be more robust.
+    - Complex command structure: Breaking down complex lines (e.g., involving `-replace` and method calls) into multiple steps can help.
+    - Special Characters/Emojis: Remove or replace problematic characters in strings, especially within `Write-Host`.
+    - Quotes: Ensure strings are correctly terminated (`"` or `'`). Extra or missing quotes cause errors. Check long strings like URLs carefully.
+- **Connection Errors (`Connect-PnPOnline`):**
+    - `"Specified method is not supported"`: Often occurs with `-Interactive`. Try switching to `-DeviceLogin`.
+    - `"Unable to connect using provided arguments"`: After Sept 2024, this usually means missing `-Tenant` and `-ClientId`. Otherwise, use `-Verbose` for more details.
+    - `WriteObject`/`WriteError` warnings: These thread-related warnings can be suppressed with `-WarningAction Ignore` and don't affect functionality.
+- **Permissions:** Ensure the account used for authentication has the necessary permissions to access the specified SharePoint site and folder.
+- **PowerShell Version:** PnP.PowerShell 3.x requires PowerShell 7.4+ and .NET 8.0. Check with `pwsh --version`.

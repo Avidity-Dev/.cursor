@@ -1,0 +1,92 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# Snowflake Integration with Veeva Direct Data API
+
+!!! Accelerator scripts were a starting point. Actual project diverged. !!!
+
+This guide explains how to use the existing Snowflake integration in this repository to load data extracted via the Veeva Direct Data API. 
+
+**IMPORTANT NOTE**: The current implementation relies heavily on **AWS S3** for staging data before loading to Snowflake. To use Azure Blob Storage, significant modifications will be required, primarily replacing `AwsS3Service` with an equivalent Azure Blob service and updating Snowflake stage configurations.
+
+## Table of Contents
+- [Overview](mdc:#overview)
+- [Key Components](mdc:#key-components)
+- [Configuration](mdc:#configuration)
+- [Core Workflow](mdc:#core-workflow)
+- [Adapting for Azure Blob Storage](mdc:#adapting-for-azure-blob-storage)
+
+## Overview
+
+The Snowflake accelerator fetches Direct Data API files from Veeva Vault, stages them in an AWS S3 bucket, and then loads them into Snowflake tables. It handles initial full loads and subsequent incremental updates, including schema changes.
+
+## Key Components
+
+-   **`accelerators/snowflake/accelerator.py`**: Main orchestration script.
+-   **`accelerators/snowflake/scripts/direct_data_to_object_storage.py`**: Retrieves data from Veeva and uploads the raw `.tar.gz` files to S3.
+-   **`accelerators/snowflake/scripts/download_and_unzip_direct_data_files.py`**: Downloads the `.tar.gz` files from S3, extracts their contents (CSV files), optionally converts them to Parquet, and uploads the processed files back to a structured folder within the S3 bucket.
+-   **`accelerators/snowflake/scripts/load_data.py`**: Reads manifest and metadata files from S3, manages schema in Snowflake (creating/altering tables), and uses Snowflake's `COPY INTO` commands to load data from S3 stages.
+-   **`accelerators/snowflake/services/vault_service.py`**: Interacts with Veeva Vault APIs (authentication, listing/downloading Direct Data files).
+-   **`accelerators/snowflake/services/aws_s3_service.py`**: Handles all interactions with AWS S3 (uploading, downloading, checking existence, multipart uploads). **This is a key module to replace for Azure Blob support.**
+-   **`accelerators/snowflake/services/snowflake_service.py`**: Manages Snowflake connection, DDL operations (creating tables, stages), and DML operations (`COPY INTO`, `MERGE` for incrementals).
+    -   Notably, `check_if_stage_exists()` creates a Snowflake stage pointing to an S3 URL: `CREATE STAGE {stage_name} URL = 's3://{s3_bucket_and_path}/' ...`.
+    -   `load_data_into_tables()` uses `COPY INTO {table_name} FROM @{s3_stage_uri}`.
+-   **`accelerators/snowflake/resources/connector_config.json`**: Configuration file for S3 connection details, Snowflake connection details, and Direct Data API parameters.
+
+## Configuration
+
+Key settings are in `accelerators/snowflake/resources/connector_config.json`:
+
+-   `direct_data`: Parameters for Veeva Direct Data API (e.g., `extract_type`, `start_time`, `stop_time`).
+-   `s3`: AWS S3 specific settings (`iam_role_arn`, `bucket_name`, `direct_data_folder`, etc.). **This section will need to be adapted for Azure Blob (e.g., connection strings, container names).**
+-   `snowflake`: Snowflake connection parameters (`account`, `database`, `schema`, `warehouse`, `username`, `role`, `stage_name`). 
+    -   The `stage_name` in the `snowflake` section currently refers to an S3 location that Snowflake will be configured to read from. For Azure, this would become an Azure Blob location, and the stage creation in `snowflake_service.py` would need to change.
+-   `convert_to_parquet`: Boolean to indicate if CSV files should be converted to Parquet format before loading to Snowflake (recommended for performance).
+
+## Core Workflow
+
+1.  **Fetch from Vault to S3**: `direct_data_to_object_storage.py` fetches the Direct Data API file(s) and uploads them to a specified S3 path (e.g., `s3://your-bucket/direct-data/archive.tar.gz`).
+2.  **Process in S3**: `download_and_unzip_direct_data_files.py` downloads the archive from S3, extracts its contents into a local temporary directory. If `convert_to_parquet` is true, CSVs are converted to Parquet. All processed files (CSVs or Parquets, manifest, metadata) are then uploaded to a structured path in S3 (e.g., `s3://your-bucket/direct-data/extracted_data_timestamp/...`).
+3.  **Load from S3 to Snowflake**: `load_data.py` orchestrates the loading:
+    *   Downloads `manifest` and `metadata` files from S3.
+    *   **Schema Management**: 
+        *   For `full` loads, if `infer_schema` is false (recommended), it uses the `metadata.csv` to create tables in Snowflake (`CREATE TABLE ...`). If `infer_schema` is true, it uses Snowflake's schema inference.
+        *   For `incremental` loads, it processes `metadata.csv` for schema changes (adds/modifies columns) and applies them to Snowflake tables.
+    *   **Data Loading**: 
+        *   It iterates through the `manifest.csv`.
+        *   For each data file listed, it ensures the corresponding Snowflake table exists.
+        *   It uses Snowflake's `COPY INTO {table_name} FROM @{s3_stage_name}/{path_to_file_in_s3} ...` command to load data. The `{s3_stage_name}` is a Snowflake stage object that points to the S3 bucket path where processed files reside.
+        *   Handles `deletes` and `updates` for incremental loads, often using temporary tables and `MERGE` statements or delete+insert patterns.
+
+## Adapting for Azure Blob Storage
+
+To switch from AWS S3 to Azure Blob Storage, you will need to:
+
+1.  **Create an Azure Blob Service Module**: Develop a new service class (e.g., `AzureBlobService`) analogous to `AwsS3Service`. This class must implement methods for:
+    *   Connecting to Azure Blob Storage (e.g., using connection strings or service principals).
+    *   Uploading files (blobs).
+    *   Downloading files.
+    *   Listing files (blobs).
+    *   Checking for file existence.
+    *   Handling multipart uploads if necessary for large files (Azure Blob has similar concepts).
+
+2.  **Update Configuration**: Modify `connector_config.json` to include Azure Blob Storage connection details (e.g., account name, container name, connection string/SAS token). Remove or adapt the `s3` section.
+
+3.  **Replace `AwsS3Service` Usage**: In `accelerator.py` and all scripts within `accelerators/snowflake/scripts/`, replace instantiations and calls to `AwsS3Service` with your new `AzureBlobService`.
+
+4.  **Modify Snowflake Stage Creation**: In `SnowflakeService` (`snowflake_service.py`), change the `CREATE STAGE` command in `check_if_stage_exists()` to point to your Azure Blob container. The syntax will be different, e.g.:
+    ```sql
+    CREATE STAGE my_azure_stage
+      URL = 'azure://youraccount.blob.core.windows.net/yourcontainer/'
+      CREDENTIALS = (AZURE_SAS_TOKEN = 'your_sas_token'); 
+    -- or using Storage Integration for more secure access
+    ```
+    You'll need to manage Azure credentials securely, possibly using Snowflake Storage Integrations for Azure.
+
+5.  **Update `COPY INTO` Commands**: Ensure the `FROM` clause in `COPY INTO` statements within `SnowflakeService` correctly references the new Azure-backed stage (e.g., `FROM @my_azure_stage/...`).
+
+6.  **Test Thoroughly**: Data transfer, schema handling, full loads, and incremental loads need to be re-tested with Azure Blob Storage.
+
+Refer to Snowflake documentation on [Loading Data from Azure Blob Storage](mdc:https:/docs.snowflake.com/en/user-guide/data-load-azure) for details on configuring stages and `COPY` commands for Azure.

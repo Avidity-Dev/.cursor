@@ -1,0 +1,69 @@
+---
+description: 
+globs: *.ps1
+alwaysApply: false
+---
+# PowerShell Scripting Best Practices
+
+This rule provides guidelines for writing robust PowerShell (`.ps1`) scripts, particularly focusing on avoiding common parsing and runtime errors.
+
+## String Handling
+
+- **Quoting:**
+    - Use single quotes (`'...'`) for literal strings where no variable expansion is needed. This is generally safer and avoids accidental interpolation.
+    - Use double quotes (`"..."`) only when variable interpolation (`$variable`) or subexpression evaluation (`$($expression)`) is required.
+- **Interpolation (`$()`):**
+    - While powerful, complex subexpressions (`$($_.Property.Method())`) inside double-quoted strings can sometimes confuse the parser.
+    - Prefer the `-f` format operator (`'{0}://{1}' -f $protocol, $host`) for constructing strings with multiple variables or expressions. It's often more readable and less prone to parsing errors.
+    - For simple cases, string concatenation (`'string ' + $variable`) can also be clearer than interpolation.
+- **Special Characters:**
+    - Be cautious with non-standard characters (like emojis `✅`, `🔗`) directly in strings, especially when targeting cross-platform environments or older terminals. They can cause unexpected parsing errors.
+    - If needed, consider storing them in variables or using their Unicode representations.
+- **String Termination:**
+    - Double-check that all strings have correctly matching opening and closing quotes (either `''` or `""`). Pay close attention to long strings (like URLs) or strings containing quotes themselves.
+
+## Cmdlet Usage
+
+- **Parentheses:**
+    - Avoid unnecessary parentheses around cmdlet calls when assigning their output to a variable (e.g., use `$path = Join-Path $a $b`, not `$path = (Join-Path $a $b)`).
+- **Named Parameters:**
+    - When calling cmdlets, especially those with multiple positional parameters (like `Join-Path`), explicitly use named parameters (`Join-Path -Path $a -ChildPath $b`). This improves readability and prevents ambiguity that can lead to parsing errors.
+
+## Error Handling & Debugging
+
+- **`-Verbose` Switch:** When a cmdlet fails unexpectedly (e.g., `Connect-PnPOnline`), add the `-Verbose` switch to its call. This often provides crucial details about the internal steps and where the failure occurred.
+- **`-ErrorAction Stop` & `Try/Catch`:** For critical operations, consider using `-ErrorAction Stop` on a cmdlet and wrapping it in a `Try { ... } Catch { ... }` block to handle potential terminating errors gracefully.
+
+## Module Management
+
+- **Keep Modules Updated:** If you encounter strange internal errors, warnings (like `WriteObject`/`WriteError` issues), or unexpected behavior from a module's cmdlets (like `PnP.PowerShell`), update the module using `Update-Module -Name ModuleName -Force`. Bug fixes in newer versions often resolve these problems.
+
+## Cross-Platform Considerations (macOS/Linux)
+
+- **Case Sensitivity:** While PowerShell itself is largely case-insensitive, the underlying OS (Linux) might be. Be mindful of file/directory names.
+- **Path Separators:** Use `Join-Path` or `.NET` methods like `[System.IO.Path]::Combine()` to construct paths robustly, rather than hardcoding `/` or `\`.
+- **External Commands:** Be aware of differences in available command-line tools compared to Windows.
+- **Authentication:** Interactive authentication methods (`-Interactive`) might be less reliable or unsupported in non-Windows terminals. Prefer alternatives like Device Code Flow (`-DeviceLogin`) when available.
+
+## PnP PowerShell Authentication (Post-September 2024)
+
+- **Custom App Registration Required:** As of September 9, 2024, the default PnP Management Shell Azure AD app was retired. You must now:
+  - Register your own Entra ID (Azure AD) app using `Register-PnPEntraIDAppForInteractiveLogin`
+  - Enable "Allow public client flows" in the app registration for device login flow
+  - Include `-Tenant` and `-ClientId` parameters with all `Connect-PnPOnline` calls
+- **Example Implementation:**
+  ```powershell
+  $Tenant = "contoso.onmicrosoft.com"
+  $ClientId = "your-app-client-id"
+  
+  Connect-PnPOnline -Url $siteUrl -DeviceLogin -Tenant $Tenant -ClientId $ClientId -WarningAction Ignore
+  ```
+- **Environment Variable Alternative:** Set `ENTRAID_APP_ID` environment variable with your client ID to avoid specifying it in every script:
+  ```powershell
+  # Windows
+  setx ENTRAID_APP_ID $ClientId
+  
+  # macOS/Linux
+  export ENTRAID_APP_ID=$ClientId
+  ```
+- **Threading Warnings:** To suppress `WriteObject`/`WriteError` method warnings in PnP.PowerShell, add `-WarningAction Ignore` to the `Connect-PnPOnline` call

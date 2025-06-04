@@ -1,0 +1,198 @@
+---
+description: How to create a new rule file for cursor (you!).
+globs: 
+alwaysApply: false
+---
+# Creating Effective Cursor Rules
+
+Cursor rules provide system-level guidance to the AI. They serve as a persistent way to encode context, preferences, or workflows for your projects.
+
+## Rule Structure
+
+Rules are stored as MDC (`.mdc`) files in the `.cursor/rules` directory. Each rule consists of:
+
+- **Metadata header** - Contains configuration options
+- **Content body** - The actual instructions in Markdown format
+
+### Metadata Options
+
+```
+---
+description: Brief description of the rule's purpose
+globs: ["*.tsx", "src/components/*.tsx"] 
+alwaysApply: false
+---
+```
+
+- **description**: Short summary of what the rule does (required for Agent Requested rules)
+- **globs**: Array of file patterns that will trigger this rule when matched
+- **alwaysApply**: When true, rule is always included in AI context
+
+## Rule Types
+
+Cursor supports four types of rules:
+
+1. **Always** - Always included in the model context
+2. **Auto Attached** - Included when files matching a glob pattern are referenced
+3. **Agent Requested** - Available to the AI, which decides whether to include it
+4. **Manual** - Only included when explicitly mentioned using @ruleName
+
+## Best Practices
+
+1. **Keep rules focused and actionable**
+   - Target specific domains or workflows
+   - Provide concrete guidance rather than vague suggestions
+
+2. **Be concise**
+   - Keep rules under 500 lines
+   - Split large concepts into multiple, composable rules
+
+3. **Include examples**
+   - Show what good implementation looks like
+   - Reference actual files when helpful
+
+4. **Use clear, instructional language**
+   - Write rules like you would write a clear internal document
+   - Be specific about expectations
+
+## Referencing Files
+
+To include existing files as context, use the `@filename` syntax:
+
+```
+@components/Button.tsx
+```
+
+Or link to files with MDC links:
+
+```
+[Component Template](mdc:components/Template.tsx)
+```
+
+## Common Use Cases
+
+- **Code Standards**: Define coding patterns, style guidelines, naming conventions
+- **Templates**: Provide reusable patterns for new components, services, etc.
+- **Domain Knowledge**: Encode business logic or project-specific information
+- **Workflows**: Define steps for common development tasks
+
+## Example Rules
+
+### Component Standards Rule
+
+```
+---
+description: Standards for React components
+globs: ["src/components/*.tsx"]
+alwaysApply: false
+---
+
+# React Component Standards
+
+Follow these standards when creating React components:
+
+1. Use functional components with TypeScript
+2. Define a Props interface for all components
+3. Use CSS modules for styling
+4. Implement proper error handling
+5. Add JSDoc comments for all public components
+
+Example component structure:
+```tsx
+import React from 'react';
+import styles from './Button.module.css';
+
+interface ButtonProps {
+  /** Button label text */
+  label: string;
+  /** Called when button is clicked */
+  onClick: () => void;
+  /** Optional variant */
+  variant?: 'primary' | 'secondary';
+}
+
+/**
+ * Standard button component with primary/secondary variants
+ */
+export const Button: React.FC<ButtonProps> = ({
+  label,
+  onClick,
+  variant = 'primary'
+}) => {
+  return (
+    <button 
+      className={styles[variant]} 
+      onClick={onClick}
+    >
+      {label}
+    </button>
+  );
+};
+```
+
+### API Validation Rule
+
+```
+---
+description: Standards for API validation
+globs: ["src/api/*.ts"]
+alwaysApply: false
+---
+
+# API Validation Standards
+
+When creating API endpoints:
+
+1. Use zod for request validation
+2. Define return types with zod schemas
+3. Export types generated from schemas
+4. Implement proper error handling
+
+Example implementation:
+```ts
+import { z } from 'zod';
+
+// Define schema
+const UserSchema = z.object({
+  id: z.string().uuid(),
+  name: z.string().min(1),
+  email: z.string().email(),
+  role: z.enum(['admin', 'user', 'guest'])
+});
+
+// Export types from schema
+export type User = z.infer<typeof UserSchema>;
+
+// Use in API route
+export async function getUser(req, res) {
+  try {
+    const { id } = z.object({ id: z.string().uuid() }).parse(req.params);
+    const user = await db.users.findUnique({ where: { id } });
+    
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
+    // Validate response data
+    const validatedUser = UserSchema.parse(user);
+    return res.json(validatedUser);
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ errors: error.errors });
+    }
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+}
+```
+
+## Creating New Rules
+
+To create a new rule:
+
+1. Use Command Palette: `Cmd + Shift + P` > "New Cursor Rule"
+2. Or manually create a `.mdc` file in `.cursor/rules` directory
+3. Add the appropriate metadata header
+4. Write your rule content using Markdown
+5. Save the file
+
+You can also generate rules from conversation using the `/Generate Cursor Rules` command.
