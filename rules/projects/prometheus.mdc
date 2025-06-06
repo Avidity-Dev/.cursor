@@ -1,7 +1,7 @@
 ---
 description: 
-globs: prometheus/**
-alwaysApply: false
+globs: 
+alwaysApply: true
 ---
 # Prometheus Project Overview
 
