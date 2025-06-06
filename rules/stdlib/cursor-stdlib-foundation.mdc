@@ -1,0 +1,116 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# Cursor Stdlib Foundation
+
+Core principles for using Cursor AI as an autonomous agent and building a comprehensive stdlib of rules.
+
+<rule>
+name: cursor_stdlib_foundation
+description: Foundational principles for building and using a Cursor rules stdlib
+filters:
+  - type: all
+    pattern: "*"
+
+principles:
+  - name: autonomous_agent_mindset
+    description: |
+      Treat Cursor as an autonomous agent, not just an IDE or search engine.
+      
+      DO:
+      - Think in terms of high-level requirements and outcomes
+      - Build systems that can solve classes of problems forever
+      - Compose multiple rules together like Unix pipes
+      - Program and fine-tune LLM outcomes through rules
+      
+      DON'T:
+      - Use Cursor as a Google replacement
+      - Give low-level "implement XYZ" instructions
+      - Treat it as a traditional IDE
+      - Use unnecessary pleasantries
+
+  - name: stdlib_approach
+    description: |
+      Build a comprehensive "standard library" of thousands of prompting rules.
+      
+      Structure:
+      ```
+      .cursor/rules/
+      ├── foundation/          # Core principles and meta-rules
+      ├── automation/          # Auto-commit, auto-license, etc.
+      ├── patterns/            # Code patterns and conventions
+      ├── debugging/           # Debugging strategies
+      ├── testing/             # Test generation and execution
+      ├── deployment/          # Build and deployment rules
+      └── project-specific/    # Project-specific knowledge
+      ```
+
+  - name: rule_composition
+    description: |
+      Rules should be:
+      1. Atomic - each rule solves one specific problem
+      2. Composable - rules can work together
+      3. Self-improving - rules update with learnings
+      4. Executable - rules can trigger actions
+
+  - name: continuous_learning
+    description: |
+      When Cursor makes a mistake:
+      1. Correct the specific issue
+      2. Ask Cursor to write/update a rule capturing the learning
+      3. The rule prevents the same mistake forever
+      4. Build up expertise brick by brick
+
+workflow:
+  - step: requirements_discussion
+    description: |
+      1. Have detailed discussions about requirements
+      2. List requirements as numbered bullet points
+      3. Write requirements to a file for context re-injection
+      4. Reference specific requirements when steering
+
+  - step: context_preparation
+    description: |
+      1. Attach relevant @files to context
+      2. Explicitly ask Cursor to "inspect and describe" files
+      3. Build understanding before implementation
+
+  - step: incremental_implementation
+    description: |
+      1. Implement one requirement at a time
+      2. Author tests alongside implementation
+      3. Include documentation
+      4. Run builds/tests after each change
+      5. Auto-commit on success
+
+  - step: rule_creation
+    description: |
+      After each successful implementation:
+      1. Ask Cursor to write a rule capturing the pattern
+      2. Store in appropriate .cursor/rules/ subdirectory
+      3. Update existing rules with new learnings
+
+examples:
+  - name: asking_for_rule_creation
+    prompt: |
+      "Write a Cursor rule that captures how to [specific pattern/solution].
+      Store it in .cursor/rules/[appropriate-category]/[descriptive-name].mdc"
+
+  - name: high_level_requirement
+    good: "Build a user authentication system with OAuth2, JWT tokens, and role-based permissions"
+    bad: "Implement a login function"
+
+  - name: learning_from_mistakes
+    scenario: "Cursor tries to use Bazel when you use Nix"
+    response: |
+      1. Correct: "We use Nix, not Bazel"
+      2. Create rule: "Write a rule that specifies we use Nix for builds, not Bazel"
+      3. Result: Cursor never suggests Bazel again
+
+metadata:
+  priority: critical
+  version: 1.0
+  author: cursor-stdlib-system
+</rule>

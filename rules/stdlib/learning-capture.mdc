@@ -1,0 +1,169 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# Learning Capture
+
+Systematic approach to capturing learnings, mistakes, and discoveries to build institutional knowledge.
+
+<rule>
+name: learning_capture
+description: Turn every mistake and discovery into a rule to prevent repetition
+filters:
+  - type: event
+    pattern: "error|mistake|discovery|insight|pattern_recognition"
+
+trigger_phrases:
+  mistakes:
+    - "that didn't work"
+    - "got an error"
+    - "this is wrong"
+    - "not what I expected"
+    - "should have been"
+    
+  discoveries:
+    - "I figured out"
+    - "the solution is"
+    - "this works"
+    - "I learned that"
+    - "the pattern is"
+
+capture_workflow:
+  - step: immediate_correction
+    description: Fix the immediate issue first
+    actions:
+      - "Correct the specific mistake"
+      - "Implement the working solution"
+      - "Verify the fix works"
+
+  - step: root_cause_analysis
+    description: Understand why it happened
+    questions:
+      - "What was the incorrect assumption?"
+      - "What knowledge was missing?"
+      - "What pattern was misunderstood?"
+      - "Is this a recurring issue?"
+
+  - step: rule_creation_prompt
+    description: Ask Cursor to create/update a rule
+    templates:
+      for_mistakes: |
+        "Write a Cursor rule that prevents {mistake_description}.
+        The rule should:
+        1. Detect when {trigger_condition}
+        2. Suggest {correct_approach} instead
+        3. Include this example of what went wrong
+        Store it in .cursor/rules/{appropriate_category}/{descriptive-name}.mdc"
+
+      for_discoveries: |
+        "Create a Cursor rule that captures the pattern for {discovery_description}.
+        Include:
+        1. When to use this pattern
+        2. Step-by-step implementation
+        3. The working example we just created
+        Store it in .cursor/rules/{appropriate_category}/{descriptive-name}.mdc"
+
+      for_updates: |
+        "Update the {existing_rule_name} rule to handle {new_case}.
+        Add:
+        1. The edge case we just discovered
+        2. The solution that worked
+        3. Why the previous approach failed"
+
+learning_categories:
+  - category: technology_quirks
+    description: "Language/framework specific gotchas"
+    examples:
+      - "Python's mutable default arguments"
+      - "JavaScript's this binding"
+      - "Nix's string interpolation"
+
+  - category: api_patterns
+    description: "How specific APIs should be used"
+    examples:
+      - "Always check response.ok before response.json()"
+      - "Use prepared statements for SQL queries"
+      - "Handle rate limits with exponential backoff"
+
+  - category: project_conventions
+    description: "Project-specific patterns and standards"
+    examples:
+      - "We use Nix, not Bazel"
+      - "All API endpoints return {status, data, error}"
+      - "Tests go in __tests__ directories"
+
+  - category: debugging_strategies
+    description: "Effective debugging approaches"
+    examples:
+      - "For Nix errors, use --show-trace"
+      - "For React hydration issues, check server/client mismatch"
+      - "For type errors, check generated types first"
+
+  - category: performance_patterns
+    description: "Optimization strategies that work"
+    examples:
+      - "Use connection pooling for database queries"
+      - "Implement pagination for large datasets"
+      - "Cache expensive computations"
+
+examples:
+  - scenario: "Nix build fails with unclear error"
+    mistake: "Running nix build without --show-trace"
+    learning: "Always use --show-trace for debugging Nix errors"
+    rule_prompt: |
+      "Create a rule for debugging Nix build failures that reminds to:
+      1. Always use --show-trace flag
+      2. Check flake.lock for version mismatches
+      3. Verify all inputs are defined
+      Include the error we just encountered as an example"
+
+  - scenario: "API returns 404 but endpoint exists"
+    mistake: "Forgot to include trailing slash in API URL"
+    learning: "API requires trailing slashes on all endpoints"
+    rule_prompt: |
+      "Update the api-conventions rule to specify that all our API endpoints
+      must include trailing slashes, with examples of correct vs incorrect URLs"
+
+  - scenario: "Test passes locally but fails in CI"
+    discovery: "Tests depend on timezone settings"
+    learning: "Always use UTC in tests"
+    rule_prompt: |
+      "Create a testing rule that ensures all date/time operations in tests
+      use UTC, including how to mock Date.now() and set process.env.TZ"
+
+anti_patterns:
+  - name: ignoring_repeated_mistakes
+    description: "Making the same mistake multiple times"
+    solution: "Create a rule after the FIRST occurrence"
+
+  - name: vague_rules
+    description: "Rules that are too general to be actionable"
+    solution: "Include specific examples and exact commands"
+
+  - name: rule_graveyard
+    description: "Creating rules but never updating them"
+    solution: "Update rules when you find edge cases"
+
+continuous_improvement:
+  daily_practice: |
+    At the end of each coding session, ask:
+    1. What mistakes did I make today?
+    2. What patterns did I discover?
+    3. Which existing rules need updates?
+    
+    Then create/update rules for each item.
+
+  weekly_review: |
+    Review your rules to:
+    1. Consolidate similar rules
+    2. Extract common patterns
+    3. Remove obsolete rules
+    4. Improve examples with recent experiences
+
+metadata:
+  priority: critical
+  version: 1.0
+  inspired_by: "ghuntley.com/stdlib"
+  philosophy: "Every mistake is a future rule; every discovery is shareable knowledge"
+</rule>
