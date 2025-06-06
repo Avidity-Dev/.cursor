@@ -1,63 +1,10 @@
 # Project Tasks
 
-- [x] **ID 1: Create Enhanced Directory Structure** (Priority: critical)
+## Completed Tasks (Archived to Memory)
 
-  > Create the new .ai/ directory structure with projects/, agents/, and memory/ folders
+_Tasks 1-13 have been completed and archived to global memory. See `.ai/memory/TASKS_LOG.md` for details._
 
-- [x] **ID 2: Create System Documentation** (Priority: critical)
-
-  > Dependencies: 1
-  > Create SYSTEM.md documenting the project management system
-
-- [x] **ID 3: Create Project Registry** (Priority: critical)
-
-  > Dependencies: 1
-  > Create INDEX.md as the central project discovery mechanism
-
-- [x] **ID 4: Create Agent Guides** (Priority: high)
-
-  > Dependencies: 1
-  > Create tool-specific guides for Cursor, Claude, and human developers
-
-- [x] **ID 5: Initialize Memory System** (Priority: high)
-
-  > Dependencies: 1
-  > Create TASKS_LOG.md and PLANS_LOG.md for archival
-
-- [x] **ID 6: Create First Project Structure** (Priority: high)
-
-  > Dependencies: 1, 3
-  > Set up task-magic-enhancement as the first project
-
-- [x] **ID 7: Create Project Plan** (Priority: high)
-
-  > Dependencies: 6
-  > Convert proposed enhancement into formal PRD
-
-- [x] **ID 8: Document Project Context** (Priority: medium)
-
-  > Dependencies: 6
-  > Create background context documentation
-
-- [ ] **ID 9: Update Task Magic Rules for Projects** (Priority: critical)
-
-  > Update tasks.mdc to support project-scoped paths
-
-- [ ] **ID 10: Update Plan Rules for Projects** (Priority: critical)
-
-  > Update plan.mdc to support project directory structure
-
-- [ ] **ID 11: Update Memory Rules** (Priority: high)
-
-  > Update memory.mdc for new directory structure
-
-- [ ] **ID 12: Update Index Rule** (Priority: high)
-
-  > Update \_index.mdc to clarify system vs rules separation
-
-- [ ] **ID 13: Create Project Management Rule** (Priority: high)
-
-  > Create new project.mdc rule for project creation
+## Active Tasks
 
 - [ ] **ID 14: Create Context Management Rule** (Priority: medium)
 
@@ -106,5 +53,50 @@
   > Create comprehensive user guide for enhanced system
 
 - [ ] **ID 24: Archive Original Proposal** (Priority: low)
+
   > Dependencies: 11
   > Test archival system with completed planning docs
+
+- [x] **ID 25: Consolidate Legacy System Guidance** (Priority: high)
+
+  > Dependencies: 9, 10, 11
+  > Create a single comprehensive rule consolidating all legacy task magic guidance, keeping tasks.mdc and plans.mdc focused on the new enhanced system
+
+- [ ] **ID 25.1: Update Documentation for Legacy Rule** (Priority: medium) _[Follow-up]_
+
+  > Dependencies: 25
+  > Update README and index to properly explain rule dispatcher role and legacy detection
+
+- [ ] **ID 26: Implement Hierarchical Project Memory System** (Priority: high) _[Parent Task - Expanded]_
+
+  > Dependencies: 26.6
+  > Parent task for implementing hierarchical memory system. Complete when all sub-tasks are finished.
+
+- [ ] **ID 26.1: Create Project Memory Directory Structure** (Priority: critical)
+
+  > Create the basic memory directory structure for the task-magic-enhancement project with tasks/ subdirectory and initial MEMORY.md template
+
+- [ ] **ID 26.2: Update Task Archival Process for Project Memory** (Priority: high)
+
+  > Dependencies: 26.1
+  > Modify the task archival logic to archive tasks to project-specific memory location instead of global memory
+
+- [ ] **ID 26.3: Implement Global Memory Aggregation System** (Priority: high)
+
+  > Dependencies: 26.1
+  > Create GLOBAL_MEMORY.md and implement logic to aggregate insights from all project memory files
+
+- [ ] **ID 26.4: Enhance INDEX.md with Memory References** (Priority: medium)
+
+  > Dependencies: 26.1, 26.3
+  > Update the existing INDEX.md to include references to project memory files and summaries
+
+- [ ] **ID 26.5: Update Task Magic Rules Documentation** (Priority: medium)
+
+  > Dependencies: 26.2, 26.3
+  > Update task-magic/memory.mdc and related rules to document the new hierarchical memory structure and processes
+
+- [ ] **ID 26.6: Test Hierarchical Memory System** (Priority: high)
+
+  > Dependencies: 26.2, 26.3, 26.4, 26.5
+  > Create sample archived tasks, test archival flows, verify aggregation works, and validate backwards compatibility

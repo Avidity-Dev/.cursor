@@ -17,26 +17,53 @@ Your task is to create a comprehensive product requirements document (PRD) for t
 
 ## Core Concepts
 
-1.  **Planning Folder:** The `.ai/plans/` directory holds all PRD files.
-2.  **Global Plan (`PLAN.MD`):** A single, mandatory `PLAN.MD` file must exist directly within `.ai/plans/`. Its primary role is to serve as a **concise high-level overview of the overall project and an index to detailed feature-specific PRDs**. It should define the project's vision and core goals but **must not become a lengthy PRD itself**. It provides essential context by linking to comprehensive feature plans.
-3.  **Feature Plans:** Specific features **must** have their detailed PRDs located within the `.ai/plans/features/` subdirectory (e.g., `features/{feature}-plan.md`). These documents contain the comprehensive planning, requirements, and technical considerations for individual features.
-4.  **Purpose:** PRDs serve as the detailed specification for specific features (`features/{feature}-plan.md`). The global `PLAN.MD` supports this by providing the overarching project summary and acting as a central hub that **links to these detailed feature PRDs**. Task breakdown (using the `ai-tasks` system) is based on the detailed content within feature plans.
-5.  **Plan Lifecycle:** Active plans reside in `.ai/plans/`. Completed, deprecated, or superseded plans can be archived to `.ai/memory/plans/` for historical reference, as detailed in the `task-magic/memory` rule.
+1.  **Project-Scoped Planning:** Each project has its own plan.md file located at `.ai/projects/{project}/plan.md` that serves as the comprehensive PRD for that project.
+2.  **Project Registry:** The global `.ai/INDEX.md` file maintains a registry of all projects and their plans, serving as the central discovery mechanism across projects.
+3.  **Feature Plans:** Complex projects may have additional feature-specific plans in `.ai/projects/{project}/context/` subdirectory (e.g., `context/{feature}-plan.md`). These documents contain detailed planning for specific features within the project.
+4.  **Purpose:** PRDs serve as the detailed specification for projects (`plan.md`) and optionally specific features (`context/{feature}-plan.md`). The global `INDEX.md` supports discovery by providing a registry of all project plans. Task breakdown (using the task system) is based on the content within project plans.
+5.  **Plan Lifecycle:** Active plans reside in `.ai/projects/{project}/`. Completed, deprecated, or superseded plans can be archived to `.ai/memory/plans/` for historical reference, as detailed in the `task-magic/memory` rule.
+
+## Project Context Detection
+
+When working with plans, the agent must determine the current project context. The agent should:
+
+1. **Check for Current Project Directory:** Look for `.ai/projects/{project}/` directories using `list_dir` on `.ai/projects/`
+2. **Default Project Behavior:** If only one project exists, use that as the context
+3. **Multi-Project Behavior:** If multiple projects exist, the agent should ask the user to specify which project they want to work with, unless the context is clear from the conversation
+4. **Backwards Compatibility:** If `.ai/plans/` and `.ai/plans/PLAN.md` exist (legacy structure), the agent should treat this as an implicit project and suggest migration
 
 ## Directory Structure
 
+### New Project-Scoped Structure
+
 ```
 .ai/
-  plans/          # Parent directory for all PRDs
-    PLAN.md       # Mandatory: Global project PRD
-    features/     # Directory for feature-specific PRDs
-      {feature}-plan.md # Example feature PRD
-  tasks/          # (For reference - Tasks are generated based on PRDs)
-  memory/         # (For reference - Task archive)
-  TASKS.md        # (For reference - Master task checklist)
+  projects/
+    {project-name}/
+      plan.md         # Comprehensive PRD for this project
+      tasks/          # Project-specific tasks
+      context/        # Optional: Additional context documents
+        {feature}-plan.md # Optional: Feature-specific detailed plans
+  memory/             # Global archive shared across all projects
+    plans/            # Archive for completed/deprecated plans from all projects
+    PLANS_LOG.md      # Append-only log of archived plans from all projects
+  INDEX.md            # Global project registry and discovery mechanism
 ```
 
-**Note:** Before creating directories like `.ai/plans/` or `.ai/plans/features/`, the agent should first check if they exist using `list_dir` on the parent directory or `file_search` for the specific directory path. If a directory does not exist, it can be implicitly created when using `edit_file` to place a file within that path, as `edit_file` will create necessary parent directories. The agent should also ensure `PLAN.md` exists (checking with `file_search` and creating with `edit_file` if necessary with a basic structure) before generating feature plans.
+### Legacy Structure (Backwards Compatibility)
+
+```
+.ai/
+  plans/          # Legacy: Parent directory for all PRDs
+    PLAN.md       # Legacy: Global project PRD
+    features/     # Legacy: Directory for feature-specific PRDs
+      {feature}-plan.md # Legacy: Feature PRD
+  tasks/          # Legacy: Tasks directory
+  memory/         # Parent directory for archive
+  TASKS.md        # Legacy: Master task checklist
+```
+
+**Note:** Before creating directories like `.ai/projects/{project}/` or `.ai/projects/{project}/context/`, the agent should first check if they exist using `list_dir` on the parent directory or `file_search` for the specific directory path. If a directory does not exist, it can be implicitly created when using `edit_file` to place a file within that path, as `edit_file` will create necessary parent directories. The agent should also ensure the project's `plan.md` exists (checking with `file_search` and creating with `edit_file` if necessary with a basic structure) before generating feature plans.
 
 ## PRD File Format
 
@@ -44,8 +71,9 @@ PRDs are Markdown files (`.md`) following a structured template.
 
 **Filename Convention:**
 
--   **Global:** `PLAN.md` (Mandatory).
--   **Feature:** `{feature}-plan.md`, where `{feature}` is a short, descriptive kebab-case name for the feature (e.g., `user-authentication-plan.md`).
+-   **Project Plan:** `plan.md` (Located at `.ai/projects/{project}/plan.md`).
+-   **Feature Plan:** `{feature}-plan.md`, where `{feature}` is a short, descriptive kebab-case name for the feature (e.g., `user-authentication-plan.md`). Located in `.ai/projects/{project}/context/` for complex projects.
+-   **Legacy Global:** `PLAN.md` (Legacy location at `.ai/plans/PLAN.md` for backwards compatibility).
 
 **PRD Template (Markdown):**
 
@@ -201,10 +229,12 @@ Agents should generate PRDs following this structure, filling in details based o
 
 ## Agent Responsibilities
 
-1.  **Ensure Global Plan Exists:** Before creating feature plans, verify `.ai/plans/PLAN.MD` exists. If not, inform the user and offer to create a basic structure for it, emphasizing its role as a **concise project summary and an index to detailed feature plans**, not a comprehensive PRD itself.
-2.  **Determine Scope:** Clarify if the request is to update the global `PLAN.MD` (which should generally involve refining the overall project vision, updating core goals, or adding/modifying links to feature PRDs) or to create/update a **detailed feature-specific plan** in `.ai/plans/features/{feature}-plan.md`. Avoid adding extensive feature details directly into `PLAN.MD`.
-3.  **Filename:** Use the correct filename convention. Create directories if they don't exist.
-4.  **Use Template:** Generate the PRD content strictly following the Markdown template structure provided above.
-5.  **Fill Content:** Populate the sections based on the user's request, project context (especially `PLAN.md`), and best practices for PRD writing.
-6.  **Completeness:** Ensure all necessary user stories (primary, alternative, edge cases, security) are included with clear acceptance criteria.
-7.  **Focus:** The agent's role is *only* to generate or update PRD Markdown files in the active planning directory (`.ai/plans/`). This means creating/editing the high-level `PLAN.MD` or detailed `features/{feature}-plan.md` files. Task creation is a separate process handled by interpreting the detailed feature PRDs using the `ai-tasks` rule. Archiving plans is handled by the `task-magic/memory` rule.
+1.  **Project Context Detection:** Before creating or updating plans, determine the current project context using the project detection logic. If multiple projects exist, ask the user to specify which project they want to work with.
+2.  **Ensure Project Plan Exists:** Before creating feature plans, verify `.ai/projects/{project}/plan.md` exists. If not, inform the user and offer to create a basic structure for it, emphasizing its role as the **comprehensive PRD for the project**.
+3.  **Determine Scope:** Clarify if the request is to update the project `plan.md` (which should contain the main project requirements) or to create/update a **detailed feature-specific plan** in `.ai/projects/{project}/context/{feature}-plan.md` for complex features that need separate documentation.
+4.  **Filename:** Use the correct filename convention for project-scoped structure. Create directories if they don't exist.
+5.  **Use Template:** Generate the PRD content strictly following the Markdown template structure provided above.
+6.  **Fill Content:** Populate the sections based on the user's request, project context (especially existing `plan.md`), and best practices for PRD writing.
+7.  **Completeness:** Ensure all necessary user stories (primary, alternative, edge cases, security) are included with clear acceptance criteria.
+8.  **Update Registry:** When creating new projects, ensure they are added to the global `.ai/INDEX.md` for discovery.
+9.  **Focus:** The agent's role is *only* to generate or update PRD Markdown files in the project planning directory (`.ai/projects/{project}/`). This means creating/editing the main `plan.md` or detailed `context/{feature}-plan.md` files. Task creation is a separate process handled by interpreting the PRDs using the task system rule. Archiving plans is handled by the `task-magic/memory` rule.

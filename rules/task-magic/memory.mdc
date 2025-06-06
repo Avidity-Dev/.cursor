@@ -9,7 +9,7 @@ Whenever you use this rule, start your message with the following:
 
 "Checking Task Magic memory..."
 
-This project utilizes a memory system located in the `.ai/memory/` directory to store a history of completed, failed, or superseded work, providing valuable context for ongoing development. It archives both tasks and plans.
+This project utilizes a memory system located in the `.ai/memory/` directory to store a history of completed, failed, or superseded work, providing valuable context for ongoing development. It archives both tasks and plans from all projects into a global memory shared across the entire workspace.
 
 ## Structure
 
@@ -17,21 +17,44 @@ The memory system consists of:
 
 ### Task Archive
 
-*   **`.ai/memory/tasks/`**: This directory contains the full Markdown files (`task{id}_name.md`) of tasks that have been archived (status: `completed` or `failed`). These files retain the original details, descriptions, and test strategies defined when the task was active.
-*   **`.ai/memory/TASKS_LOG.md`**: This is an append-only Markdown file that serves as a chronological log of when tasks were archived. Each entry summarizes the archived task, including its ID, Title, final Status, Dependencies, and the Description extracted from the task file at the time of archival.
+*   **`.ai/memory/tasks/`**: This directory contains the full Markdown files (`task{id}_name.md`) of tasks that have been archived (status: `completed` or `failed`) from any project. These files retain the original details, descriptions, and test strategies defined when the task was active. Task files from all projects are stored together in this global archive.
+*   **`.ai/memory/TASKS_LOG.md`**: This is an append-only Markdown file that serves as a chronological log of when tasks were archived from any project. Each entry summarizes the archived task, including its ID, Title, final Status, Dependencies, Project context, and the Description extracted from the task file at the time of archival.
 
 ### Plan Archive
 
-*   **`.ai/memory/plans/`**: This directory contains the full Markdown files of PRDs (both global `PLAN.md` versions and feature plans like `{feature}-plan.md`) that have been archived. Plans might be archived when they are completed (all associated features are implemented and stable), deprecated (the feature or project direction is abandoned), or superseded by a newer version of the plan.
-*   **`.ai/memory/PLANS_LOG.md`**: This is an append-only Markdown file that serves as a chronological log of when plans were archived. Each entry should summarize the archived plan, including its **full path within the `.ai/memory/plans/` directory** (e.g., `.ai/memory/plans/old-feature-plan.md`), a version or date stamp, the reason for archival (e.g., Completed, Deprecated, Superseded), and a brief description or title of the plan.
+*   **`.ai/memory/plans/`**: This directory contains the full Markdown files of PRDs (both project `plan.md` files and feature plans like `{feature}-plan.md`) that have been archived from any project. Plans might be archived when they are completed (all associated features are implemented and stable), deprecated (the feature or project direction is abandoned), or superseded by a newer version of the plan.
+*   **`.ai/memory/PLANS_LOG.md`**: This is an append-only Markdown file that serves as a chronological log of when plans were archived from any project. Each entry should summarize the archived plan, including its **full path within the `.ai/memory/plans/` directory** (e.g., `.ai/memory/plans/{project}-plan.md`), the source project, a version or date stamp, the reason for archival (e.g., Completed, Deprecated, Superseded), and a brief description or title of the plan.
     *   **Log Entry Format Example for PLANS_LOG.md:**
         ```markdown
-        - **Archived Plan:** `.ai/memory/plans/old-feature-plan.md`
+        - **Archived Plan:** `.ai/memory/plans/{project}-plan.md`
           - **Archived On:** YYYY-MM-DD HH:MM:SS
-          - **Reason:** Deprecated
-          - **Title:** PRD: Old Feature
-          - **Original File (Optional):** {.ai/plans/features/old-feature-plan.md}
+          - **Project:** {project-name}
+          - **Reason:** Completed
+          - **Title:** PRD: Project Name
+          - **Original File:** `.ai/projects/{project}/plan.md`
         ```
+
+### Project Context in Archives
+
+Since the memory system is global and stores items from multiple projects, it's crucial to maintain project context:
+
+*   **Task Files:** When archiving task files, they maintain their original content which includes project-specific information in their YAML frontmatter (feature field, etc.)
+*   **Plan Files:** Plan files are archived with project-identifying names (e.g., `{project}-plan.md`, `{project}-{feature}-plan.md`)
+*   **Log Entries:** Both TASKS_LOG.md and PLANS_LOG.md include project information to help identify the source project
+
+## Source Path Resolution
+
+The memory system supports archiving from both current project-scoped paths and legacy paths:
+
+### Current Project-Scoped Sources
+*   **Tasks:** `.ai/projects/{project}/tasks/` → `.ai/memory/tasks/`
+*   **Plans:** `.ai/projects/{project}/plan.md` → `.ai/memory/plans/{project}-plan.md`
+*   **Feature Plans:** `.ai/projects/{project}/context/{feature}-plan.md` → `.ai/memory/plans/{project}-{feature}-plan.md`
+
+### Legacy Sources (Backwards Compatibility)
+*   **Tasks:** `.ai/tasks/` → `.ai/memory/tasks/`
+*   **Plans:** `.ai/plans/PLAN.md` → `.ai/memory/plans/legacy-plan.md`
+*   **Feature Plans:** `.ai/plans/features/{feature}-plan.md` → `.ai/memory/plans/legacy-{feature}-plan.md`
 
 ## Directory and File Management
 
@@ -41,25 +64,57 @@ When working with the memory system, the agent should always verify that require
 
 2. **Check Files Before Operations:** Before operating on files like `.ai/memory/TASKS_LOG.md` or `.ai/memory/PLANS_LOG.md`, the agent should use the `file_search` tool with the full file path to check for its existence.
 
-3. **Safe File Creation/Modification:** If a file like `.ai/memory/TASKS_LOG.md` or `.ai/memory/PLANS_LOG.md` doesn't exist (as determined by `file_search`), and it needs to be created with initial content (e.g., `"\# Task Archive Log\\n\\n"` or `"\# Plan Archive Log\\n\\n"`), use the `edit_file` tool. To append to an existing file, first use `read_file` to get its current content, then append the new data to this content, and finally use `edit_file` to write the combined content back.
+3. **Safe File Creation/Modification:** If a file like `.ai/memory/TASKS_LOG.md` or `.ai/memory/PLANS_LOG.md` doesn't exist (as determined by `file_search`), and it needs to be created with initial content (e.g., `"# Task Archive Log\n\n"` or `"# Plan Archive Log\n\n"`), use the `edit_file` tool. To append to an existing file, first use `read_file` to get its current content, then append the new data to this content, and finally use `edit_file` to write the combined content back.
 
-4. **Archiving Plan Files:** When moving a plan file (e.g., from `.ai/plans/features/` to `.ai/memory/plans/`), always use the `run_terminal_cmd` tool with the `mv` command. Do not use `edit_file` to create a new file in the destination and `delete_file` to remove the original. This ensures the file is moved atomically and preserves its history if version control is used. Example: `mv .ai/plans/features/my-feature-plan.md .ai/memory/plans/my-feature-plan.md`.
+4. **Archiving Task Files:** When moving a task file from a project (e.g., from `.ai/projects/{project}/tasks/` to `.ai/memory/tasks/`), always use the `run_terminal_cmd` tool with the `mv` command. Example: `mv .ai/projects/{project}/tasks/task{id}_name.md .ai/memory/tasks/task{id}_name.md`.
+
+5. **Archiving Plan Files:** When moving a plan file from a project (e.g., from `.ai/projects/{project}/plan.md` to `.ai/memory/plans/`), use the `run_terminal_cmd` tool with the `mv` command and include project context in the filename. Example: `mv .ai/projects/{project}/plan.md .ai/memory/plans/{project}-plan.md`.
+
+## Updated Log Formats
+
+### TASKS_LOG.md Format (Updated for Project Context)
+
+When archiving tasks, append an entry to `.ai/memory/TASKS_LOG.md` using this format:
+
+```markdown
+- Archived **ID {id}: {Title}** (Status: {completed/failed}) on {YYYY-MM-DDTHH:MM:SSZ}
+> Project: {project-name}
+> Dependencies: {dep_id1}, {dep_id2}... (Only shown if dependencies exist in YAML, use full IDs like 15 or 15.1)
+> {Description} (Extracted from task file)
+```
+
+For legacy tasks (from `.ai/tasks/`), use "legacy" as the project name.
+
+### PLANS_LOG.md Format (Updated for Project Context)
+
+When archiving plans, append an entry to `.ai/memory/PLANS_LOG.md` using this format:
+
+```markdown
+- **Archived Plan:** `.ai/memory/plans/{archived-filename}.md`
+  - **Archived On:** YYYY-MM-DDTHH:MM:SSZ
+  - **Project:** {project-name}
+  - **Reason:** {Completed/Deprecated/Superseded}
+  - **Title:** {Plan Title}
+  - **Original File:** `.ai/projects/{project}/plan.md` (or original path)
+```
 
 ## Purpose and Usage
 
-The memory system serves as the project's historical record of development activity and planning managed by the AI task system.
+The memory system serves as the project's historical record of development activity and planning managed by the AI task system across all projects.
 
 **When to Consult Memory:**
 
-*   **Understanding Past Implementations & Plans:** Before starting a new task or planning a new feature, consult the memory (`TASKS_LOG.md`, `PLANS_LOG.md`, and relevant archived files) to understand how similar or dependent features were built and planned.
-*   **Avoiding Redundancy:** Check if a similar task, requirement, or plan has been addressed previously.
+*   **Understanding Past Implementations & Plans:** Before starting a new task or planning a new feature, consult the memory (`TASKS_LOG.md`, `PLANS_LOG.md`, and relevant archived files) to understand how similar or dependent features were built and planned across all projects.
+*   **Cross-Project Learning:** Leverage solutions, patterns, and approaches from other projects stored in the global memory.
+*   **Avoiding Redundancy:** Check if a similar task, requirement, or plan has been addressed previously in any project.
 *   **Planning Related Features:** Review past tasks and plans for a feature to inform the planning and task breakdown of new, related features.
-*   **Investigating Failed Tasks:** If a task failed previously, reviewing its archived file (including the `error_log` in the YAML) can provide context.
-*   **Historical Context of Decisions:** Archived plans provide a snapshot of the project's goals, requirements, and intended direction at a particular point in time.
+*   **Investigating Failed Tasks:** If a task failed previously, reviewing its archived file (including the `error_log` in the YAML) can provide context regardless of which project it came from.
+*   **Historical Context of Decisions:** Archived plans provide a snapshot of project goals, requirements, and intended direction at particular points in time.
 
 **How to Consult Memory:**
 
-1.  **Start with the Logs:** Read `.ai/memory/TASKS_LOG.md` and `.ai/memory/PLANS_LOG.md` to get a chronological overview of archived items. Identify potentially relevant tasks or plans based on their titles, descriptions, and reasons for archival.
+1.  **Start with the Logs:** Read `.ai/memory/TASKS_LOG.md` and `.ai/memory/PLANS_LOG.md` to get a chronological overview of archived items. Identify potentially relevant tasks or plans based on their titles, descriptions, project context, and reasons for archival.
 2.  **Dive into Archived Files:** If a log entry suggests an item is highly relevant, read the full archived file from its respective directory (`.ai/memory/tasks/` or `.ai/memory/plans/`) to get the complete details.
+3.  **Cross-Project Analysis:** Use project information in the logs to identify patterns, solutions, or approaches from other projects that might be applicable to the current work.
 
-By leveraging this historical context, the AI can make more informed decisions, maintain consistency, and work more efficiently on the project.
+By leveraging this historical context from across all projects, the AI can make more informed decisions, maintain consistency, avoid repeating mistakes, and work more efficiently on new development tasks.

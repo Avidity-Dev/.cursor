@@ -3,3 +3,133 @@ description:
 globs:
 alwaysApply: false
 ---
+# Automatic Conventional Commits
+
+Rule for automatically committing changes made by Cursor using conventional commits format after successful builds or tests.
+
+<rule>
+name: auto_commit_conventional
+description: Automatically commit changes using conventional commits format
+filters:
+  - type: event
+    pattern: "build_success|test_success|requirement_complete"
+  - type: file_change
+    pattern: "*"
+
+configuration:
+  enabled: true
+  commit_on:
+    - build_success
+    - test_success
+    - requirement_implementation
+  
+  conventional_types:
+    feat: ["add", "create", "implement", "introduce", "build"]
+    fix: ["fix", "correct", "resolve", "repair", "patch"]
+    refactor: ["refactor", "restructure", "reorganize", "improve"]
+    test: ["test", "testing", "spec", "unit", "integration"]
+    docs: ["document", "documentation", "readme", "comment"]
+    style: ["style", "format", "prettier", "lint", "spacing"]
+    perf: ["performance", "optimize", "speed", "efficiency"]
+    chore: ["chore", "maintain", "update", "upgrade", "dependency"]
+    ci: ["ci", "pipeline", "workflow", "automation"]
+    build: ["build", "compile", "bundle", "package"]
+
+actions:
+  - type: analyze_changes
+    description: |
+      Analyze the changes to determine:
+      1. Type of change (feat, fix, etc.)
+      2. Scope (derived from file path or component)
+      3. Description (clear, imperative mood)
+
+  - type: generate_commit_message
+    template: |
+      # Analyze change context
+      CHANGE_TYPE=$(determine_change_type "$CHANGE_DESCRIPTION")
+      SCOPE=$(extract_scope "$FILE_PATH")
+      
+      # Generate message
+      if [ -n "$SCOPE" ]; then
+        MESSAGE="$CHANGE_TYPE($SCOPE): $DESCRIPTION"
+      else
+        MESSAGE="$CHANGE_TYPE: $DESCRIPTION"
+      fi
+
+  - type: execute_commit
+    commands:
+      - "git add ."
+      - "git commit -m \"$MESSAGE\""
+    conditions:
+      - all_tests_pass
+      - no_linting_errors
+      - build_successful
+
+commit_message_rules:
+  - rule: imperative_mood
+    description: Use imperative mood in commit messages
+    examples:
+      good: ["add authentication", "fix memory leak", "update dependencies"]
+      bad: ["added authentication", "fixes memory leak", "updated dependencies"]
+
+  - rule: concise_description
+    description: Keep descriptions concise but descriptive
+    max_length: 72
+    examples:
+      good: "add user authentication with JWT tokens"
+      bad: "implemented a new feature that allows users to authenticate using JSON Web Tokens"
+
+  - rule: scope_extraction
+    description: Extract scope from file paths
+    patterns:
+      - pattern: "src/components/(.*)/.*" 
+        scope: "components-$1"
+      - pattern: "lib/(.*)/.*"
+        scope: "lib-$1"
+      - pattern: "tests/(.*)/.*"
+        scope: "test-$1"
+      - pattern: "docs/(.*)"
+        scope: "docs"
+
+examples:
+  - scenario: "After implementing new feature"
+    change: "add user authentication function"
+    file: "src/auth/login.ts"
+    output: "feat(auth): add user authentication function"
+
+  - scenario: "After fixing bug"
+    change: "fix incorrect date parsing in utils"
+    file: "lib/utils/date.js"
+    output: "fix(utils): fix incorrect date parsing"
+
+  - scenario: "After adding tests"
+    change: "add unit tests for auth module"
+    file: "tests/auth/login.spec.ts"
+    output: "test(auth): add unit tests for auth module"
+
+  - scenario: "After refactoring"
+    change: "refactor database connection handling"
+    file: "src/db/connection.js"
+    output: "refactor(db): refactor database connection handling"
+
+integration:
+  with_other_rules:
+    - pre_commit_checks
+    - code_formatting
+    - test_execution
+    - build_validation
+
+  workflow: |
+    1. Detect successful completion of task
+    2. Analyze all changed files
+    3. Determine commit type and scope
+    4. Generate conventional commit message
+    5. Stage changes
+    6. Create commit
+    7. Log commit hash for reference
+
+metadata:
+  priority: high
+  version: 1.0
+  inspired_by: "ghuntley.com/stdlib"
+</rule>

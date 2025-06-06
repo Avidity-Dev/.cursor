@@ -1,0 +1,380 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# Task Magic Legacy Migration Guide
+
+Whenever you use this rule, start your message with the following:
+
+"Checking Task Magic migration guide..."
+
+This rule provides comprehensive guidance for **upgrading from the original Task Magic system developed by Ian Nuttall** to an **enhanced, project-scoped, version**. Use this when you encounter legacy structures or need to help users migrate to the new system.
+
+## Table of Contents
+
+- [Migration Detection](mdc:#migration-detection)
+- [Why Upgrade?](mdc:#why-upgrade)
+- [Pre-Migration Assessment](mdc:#pre-migration-assessment)
+- [Migration Process](mdc:#migration-process)
+- [Post-Migration Verification](mdc:#post-migration-verification)
+- [Troubleshooting](mdc:#troubleshooting)
+
+## Migration Detection
+
+### How to Identify Legacy System
+
+**Legacy indicators you'll encounter:**
+- `.ai/tasks/` directory exists (instead of `.ai/projects/{project}/tasks/`)
+- `.ai/TASKS.md` file exists (instead of `.ai/projects/{project}/TASKS.md`)
+- `.ai/plans/PLAN.md` file exists (instead of `.ai/projects/{project}/plan.md`)
+- `.ai/plans/features/` directory exists (instead of `.ai/projects/{project}/context/`)
+- No `.ai/projects/` directory structure
+- No `.ai/INDEX.md` registry file
+
+### What the Agent Should Do
+
+When detecting legacy structure:
+1. **Inform the user** about the enhanced system benefits
+2. **Offer to migrate** to the new project-scoped structure
+3. **Explain the advantages** of the upgrade
+4. **Provide step-by-step migration** if user agrees
+
+## Why Upgrade?
+
+### Enhanced System Benefits
+
+**🚀 Multi-Project Support:**
+- Isolate different projects completely
+- Work on multiple initiatives without confusion
+- Each project has its own task and plan space
+
+**📁 Better Organization:**
+- Clear project boundaries and context
+- Easier navigation and file discovery
+- Scalable structure that grows with your needs
+
+**🤝 Team Collaboration:**
+- Multiple teams can work independently
+- Project-specific contexts prevent conflicts
+- Clear ownership and responsibility
+
+**🔍 Improved Discovery:**
+- Global project registry in `.ai/INDEX.md`
+- Easy project switching and management
+- Historical context preserved across projects
+
+### Legacy System Limitations
+
+**❌ Single Project Only:**
+- All tasks and plans mixed together
+- Difficult to separate different initiatives
+- Context switching becomes confusing
+
+**❌ Scalability Issues:**
+- Directory becomes cluttered over time
+- Hard to find specific project information
+- No clear project boundaries
+
+**❌ Collaboration Conflicts:**
+- Multiple teams step on each other's work
+- No project isolation
+- Shared task IDs can cause confusion
+
+## Pre-Migration Assessment
+
+### Data Inventory
+
+Before migration, assess what exists:
+
+**Tasks:**
+- Count of active tasks in `.ai/tasks/`
+- Check for any in-progress tasks
+- Identify task dependencies
+
+**Plans:**
+- Main plan in `.ai/plans/PLAN.md`
+- Feature plans in `.ai/plans/features/`
+- Any archived or draft plans
+
+**Memory:**
+- Existing archives in `.ai/memory/`
+- Historical logs to preserve
+
+### Project Identification
+
+**Key Questions:**
+1. What should the main project be named?
+2. Are there multiple distinct projects that should be separated?
+3. Which tasks/plans belong to which project?
+4. What context should be preserved?
+
+## Migration Process
+
+### Step 1: Backup Current Structure
+
+```bash
+# Create backup of current .ai/ directory
+cp -r .ai .ai.backup
+```
+
+### Step 2: Create New Project Structure
+
+**Determine Project Name:**
+- Ask user for project name (kebab-case format)
+- Default suggestion based on existing `PLAN.md` title
+- Example: `task-magic-enhancement`, `user-authentication`, `data-pipeline`
+
+**Create Directories:**
+```bash
+mkdir -p .ai/projects/{project-name}/tasks
+mkdir -p .ai/projects/{project-name}/context
+```
+
+### Step 3: Migrate Plans
+
+**Main Plan Migration:**
+```bash
+# Move main plan
+mv .ai/plans/PLAN.md .ai/projects/{project-name}/plan.md
+
+# Move feature plans if they exist
+if [ -d ".ai/plans/features" ]; then
+    mv .ai/plans/features/* .ai/projects/{project-name}/context/
+fi
+```
+
+### Step 4: Migrate Tasks
+
+**Task Migration:**
+```bash
+# Move task files
+mv .ai/tasks/* .ai/projects/{project-name}/tasks/
+
+# Move task checklist
+mv .ai/TASKS.md .ai/projects/{project-name}/TASKS.md
+```
+
+### Step 5: Create Project Registry
+
+**Initialize INDEX.md:**
+```markdown
+# Project Index
+
+This file serves as the central registry for all projects in the Task Magic system.
+
+## Active Projects
+
+### {Project Name}
+- **Path:** `.ai/projects/{project-name}/`
+- **Plan:** [plan.md](mdc:.ai/projects/{project-name}/plan.md)
+- **Tasks:** [TASKS.md](mdc:.ai/projects/{project-name}/TASKS.md)
+- **Status:** Active
+- **Description:** {Brief description of the project}
+
+## Archived Projects
+
+(None yet)
+
+---
+
+*Last updated: {timestamp}*
+```
+
+### Step 6: Clean Up Legacy Structure
+
+**Remove Empty Directories:**
+```bash
+# Remove empty legacy directories
+rmdir .ai/plans/features 2>/dev/null || true
+rmdir .ai/plans 2>/dev/null || true
+rmdir .ai/tasks 2>/dev/null || true
+```
+
+### Step 7: Update Cross-References
+
+**Update References in Files:**
+- Update any hardcoded paths in task files
+- Update documentation references
+- Update any scripts or automation that reference old paths
+
+## Post-Migration Verification
+
+### Verification Checklist
+
+**✅ Structure Check:**
+- [ ] `.ai/projects/{project-name}/` exists
+- [ ] `.ai/projects/{project-name}/plan.md` exists and has content
+- [ ] `.ai/projects/{project-name}/TASKS.md` exists and has tasks
+- [ ] `.ai/projects/{project-name}/tasks/` contains task files
+- [ ] `.ai/INDEX.md` exists and lists the project
+- [ ] Legacy directories (`.ai/tasks/`, `.ai/plans/`) are removed or empty
+
+**✅ Content Check:**
+- [ ] All task files migrated successfully
+- [ ] Task IDs and dependencies preserved
+- [ ] Plan content intact
+- [ ] Feature context preserved
+- [ ] Memory/archive content untouched
+
+**✅ Functionality Check:**
+- [ ] Can read project tasks with new rules
+- [ ] Can create new tasks in project structure
+- [ ] Can update plans in new location
+- [ ] Archive functionality works with new paths
+
+### Test Commands
+
+```bash
+# Test basic functionality
+@task-magic/tasks.mdc show tasks
+@task-magic/plan.mdc show plan
+```
+
+## Troubleshooting
+
+### Common Issues
+
+**Issue: Task dependencies reference missing tasks**
+- **Cause:** Task files didn't migrate completely
+- **Solution:** Check `.ai.backup/tasks/` for missing files, copy manually
+
+**Issue: Plan content is empty after migration**
+- **Cause:** Original plan file was empty or corrupted
+- **Solution:** Restore from backup, create new plan structure
+
+**Issue: Project name conflicts with existing directory**
+- **Cause:** Chosen project name already exists
+- **Solution:** Choose different name, append version number
+
+**Issue: Cross-references broken in task files**
+- **Cause:** Task files reference old file paths
+- **Solution:** Update references manually or via search/replace
+
+### Recovery Process
+
+**If Migration Fails:**
+1. Stop the migration process
+2. Restore from backup: `rm -rf .ai && mv .ai.backup .ai`
+3. Identify the issue using error messages
+4. Fix the underlying problem
+5. Retry migration with corrected approach
+
+**Partial Migration Recovery:**
+1. Identify what migrated successfully
+2. Complete the remaining steps manually
+3. Verify each component works before proceeding
+
+## Migration Script Template
+
+Here's a template script for automated migration:
+
+```bash
+#!/bin/bash
+
+# Task Magic Legacy Migration Script
+# Usage: ./migrate.sh <project-name>
+
+PROJECT_NAME="$1"
+
+if [ -z "$PROJECT_NAME" ]; then
+    echo "Usage: $0 <project-name>"
+    exit 1
+fi
+
+# Backup
+echo "Creating backup..."
+cp -r .ai .ai.backup
+
+# Create structure
+echo "Creating project structure..."
+mkdir -p .ai/projects/$PROJECT_NAME/tasks
+mkdir -p .ai/projects/$PROJECT_NAME/context
+
+# Migrate plans
+if [ -f ".ai/plans/PLAN.md" ]; then
+    echo "Migrating main plan..."
+    mv .ai/plans/PLAN.md .ai/projects/$PROJECT_NAME/plan.md
+fi
+
+if [ -d ".ai/plans/features" ]; then
+    echo "Migrating feature plans..."
+    mv .ai/plans/features/* .ai/projects/$PROJECT_NAME/context/
+fi
+
+# Migrate tasks
+if [ -d ".ai/tasks" ]; then
+    echo "Migrating tasks..."
+    mv .ai/tasks/* .ai/projects/$PROJECT_NAME/tasks/
+fi
+
+if [ -f ".ai/TASKS.md" ]; then
+    echo "Migrating task checklist..."
+    mv .ai/TASKS.md .ai/projects/$PROJECT_NAME/TASKS.md
+fi
+
+# Create registry
+echo "Creating project registry..."
+cat > .ai/INDEX.md << EOF
+# Project Index
+
+## Active Projects
+
+### $PROJECT_NAME
+- **Path:** \`.ai/projects/$PROJECT_NAME/\`
+- **Plan:** [plan.md](mdc:.ai/projects/$PROJECT_NAME/plan.md)
+- **Tasks:** [TASKS.md](mdc:.ai/projects/$PROJECT_NAME/TASKS.md)
+- **Status:** Active
+- **Description:** Migrated from legacy Task Magic structure
+
+## Archived Projects
+
+(None yet)
+
+---
+
+*Last updated: $(date)*
+EOF
+
+# Clean up
+echo "Cleaning up legacy directories..."
+rmdir .ai/plans/features 2>/dev/null || true
+rmdir .ai/plans 2>/dev/null || true
+rmdir .ai/tasks 2>/dev/null || true
+
+echo "Migration complete! Project: $PROJECT_NAME"
+echo "Backup available at: .ai.backup"
+```
+
+## Agent Migration Workflow
+
+When an agent encounters legacy structure:
+
+1. **Detect:** Identify legacy indicators
+2. **Assess:** Evaluate what needs to be migrated
+3. **Propose:** Suggest migration with benefits explanation
+4. **Execute:** If user agrees, run migration process
+5. **Verify:** Confirm migration successful
+6. **Guide:** Help user understand new structure
+
+**Agent Migration Template:**
+
+```
+I've detected that you're using the legacy Task Magic structure with `.ai/tasks/` and `.ai/plans/`. 
+
+The enhanced system offers significant benefits:
+- Multi-project support with isolation
+- Better organization and scalability  
+- Improved team collaboration
+- Global project registry for discovery
+
+Would you like me to migrate your current structure to the enhanced project-scoped system? I can:
+
+1. Create a backup of your current structure
+2. Migrate all tasks and plans to a new project
+3. Set up the project registry
+4. Clean up the legacy directories
+5. Verify everything works correctly
+
+The migration is reversible - I'll keep a backup. What would you like to name your project?
+```

@@ -3,3 +3,189 @@ description:
 globs:
 alwaysApply: false
 ---
+# Requirements-Driven Development
+
+A systematic workflow for implementing features through detailed requirements discussion and incremental implementation.
+
+<rule>
+name: requirements_driven_development
+description: Structured approach to gathering requirements and implementing them systematically
+filters:
+  - type: context
+    pattern: "feature_implementation|new_project|major_change"
+
+workflow:
+  - phase: requirements_gathering
+    description: Detailed discussion and documentation of requirements
+    steps:
+      - name: initial_discussion
+        actions:
+          - "Engage in detailed discussion about the feature/project"
+          - "Ask clarifying questions to understand the full scope"
+          - "Identify edge cases and potential challenges"
+          - "Discuss non-functional requirements (performance, security, etc.)"
+
+      - name: requirements_documentation
+        actions:
+          - "List all requirements as numbered bullet points"
+          - "Group requirements by category (functional, technical, UX, etc.)"
+          - "Prioritize requirements (must-have, nice-to-have, future)"
+          - "Write requirements to a file for persistent reference"
+        output_file: "requirements-{feature_name}.md"
+        template: |
+          # {feature_name} Requirements
+          
+          ## Functional Requirements
+          1. [REQ-F001] {requirement_description}
+          2. [REQ-F002] {requirement_description}
+          
+          ## Technical Requirements
+          1. [REQ-T001] {requirement_description}
+          2. [REQ-T002] {requirement_description}
+          
+          ## Non-Functional Requirements
+          1. [REQ-N001] {requirement_description}
+          
+          ## Acceptance Criteria
+          - [ ] {criteria_1}
+          - [ ] {criteria_2}
+
+  - phase: context_preparation
+    description: Prepare and understand the codebase context
+    steps:
+      - name: file_inspection
+        actions:
+          - "Attach relevant @files to context"
+          - "Explicitly request: 'inspect and describe {file}'"
+          - "Understand existing patterns and conventions"
+          - "Identify integration points"
+
+      - name: architecture_review
+        actions:
+          - "Review overall system architecture"
+          - "Identify affected components"
+          - "Plan integration approach"
+          - "Document architectural decisions"
+
+  - phase: implementation_planning
+    description: Break down requirements into implementable tasks
+    steps:
+      - name: task_breakdown
+        actions:
+          - "Break each requirement into atomic tasks"
+          - "Order tasks by dependency"
+          - "Estimate complexity for each task"
+          - "Identify potential blockers"
+
+      - name: implementation_order
+        template: |
+          ## Implementation Plan for {feature_name}
+          
+          ### Phase 1: Foundation
+          - [ ] Task 1: {description} [REQ-F001]
+          - [ ] Task 2: {description} [REQ-T001]
+          
+          ### Phase 2: Core Features
+          - [ ] Task 3: {description} [REQ-F002]
+          
+          ### Phase 3: Polish & Testing
+          - [ ] Task 4: Write comprehensive tests
+          - [ ] Task 5: Update documentation
+
+  - phase: incremental_implementation
+    description: Implement requirements one at a time
+    steps:
+      - name: single_requirement_focus
+        actions:
+          - "Select one requirement/task to implement"
+          - "Reference specific requirement ID when implementing"
+          - "Implement the minimal working solution first"
+          - "Refactor and optimize after it works"
+
+      - name: test_alongside
+        actions:
+          - "Write tests for the requirement being implemented"
+          - "Include unit tests for new functions"
+          - "Add integration tests for feature flows"
+          - "Ensure tests pass before moving on"
+
+      - name: documentation_inline
+        actions:
+          - "Document code with clear comments"
+          - "Update API documentation if applicable"
+          - "Add usage examples"
+          - "Update README if needed"
+
+      - name: validation_checkpoint
+        actions:
+          - "Run all tests"
+          - "Check linting and formatting"
+          - "Verify requirement is fully met"
+          - "Cross-check with acceptance criteria"
+
+  - phase: continuous_feedback
+    description: Maintain context and steer implementation
+    steps:
+      - name: requirement_reference
+        actions:
+          - "When something goes wrong, cite specific requirement"
+          - "Example: 'This violates REQ-F002 which states...'"
+          - "Use requirement IDs to maintain clarity"
+
+      - name: context_reinjection
+        actions:
+          - "If context is lost, re-attach requirements file"
+          - "Remind of current implementation phase"
+          - "Reference completed vs remaining tasks"
+
+      - name: course_correction
+        actions:
+          - "If implementation deviates, reference original requirement"
+          - "Suggest alternative approaches while staying aligned"
+          - "Update requirements if scope genuinely needs to change"
+
+best_practices:
+  - practice: atomic_commits
+    description: "Commit after each successfully implemented requirement"
+    
+  - practice: requirement_traceability
+    description: "Every code change should trace back to a requirement"
+    
+  - practice: incremental_validation
+    description: "Validate each piece works before moving to the next"
+    
+  - practice: context_persistence
+    description: "Keep requirements file updated and referenced throughout"
+
+examples:
+  - scenario: "Building an authentication system"
+    requirements_file: |
+      # Authentication System Requirements
+      
+      ## Functional Requirements
+      1. [REQ-F001] Users can register with email and password
+      2. [REQ-F002] Users can login with credentials
+      3. [REQ-F003] System supports password reset via email
+      4. [REQ-F004] Sessions expire after 24 hours of inactivity
+      
+      ## Technical Requirements
+      1. [REQ-T001] Use JWT tokens for session management
+      2. [REQ-T002] Passwords must be hashed with bcrypt (min 10 rounds)
+      3. [REQ-T003] Implement rate limiting (5 attempts per minute)
+      
+      ## Non-Functional Requirements
+      1. [REQ-N001] Login response time < 200ms
+      2. [REQ-N002] Support 10,000 concurrent sessions
+
+    implementation_approach: |
+      1. Start with REQ-T002 (password hashing utilities)
+      2. Implement REQ-F001 (registration) using the hashing
+      3. Add REQ-F002 (login) with REQ-T001 (JWT)
+      4. Layer in REQ-T003 (rate limiting)
+      5. Test performance for REQ-N001
+
+metadata:
+  priority: critical
+  version: 1.0
+  inspired_by: "ghuntley.com/stdlib"
+</rule>

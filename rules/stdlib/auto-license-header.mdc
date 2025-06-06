@@ -3,3 +3,175 @@ description:
 globs:
 alwaysApply: false
 ---
+# Automatic License Header
+
+Automatically add appropriate license headers to new files based on file type.
+
+<rule>
+name: auto_license_header
+description: Automatically add license headers to new files on creation
+filters:
+  - type: event
+    pattern: "file_create"
+  - type: file_extension
+    pattern: "*"
+
+configuration:
+  license_tool: "depot-addlicense"
+  default_copyright: "Copyright (c) 2025"
+  default_license: "SPDX-License-Identifier: Proprietary"
+
+actions:
+  - type: execute
+    command: 'depot-addlicense "$FILE"'
+    fallback: add_header_manually
+
+  - type: add_header_manually
+    description: Add license header based on file type
+    templates:
+      go:
+        pattern: "*.go"
+        header: |
+          // Copyright (c) {year} {author}. All rights reserved.
+          // SPDX-License-Identifier: {license}
+
+      python:
+        pattern: "*.py"
+        header: |
+          # Copyright (c) {year} {author}. All rights reserved.
+          # SPDX-License-Identifier: {license}
+
+      javascript:
+        pattern: "*.js|*.ts|*.jsx|*.tsx"
+        header: |
+          /**
+           * Copyright (c) {year} {author}. All rights reserved.
+           * SPDX-License-Identifier: {license}
+           */
+
+      rust:
+        pattern: "*.rs"
+        header: |
+          // Copyright (c) {year} {author}. All rights reserved.
+          // SPDX-License-Identifier: {license}
+
+      c_cpp:
+        pattern: "*.c|*.cpp|*.h|*.hpp"
+        header: |
+          /*
+           * Copyright (c) {year} {author}. All rights reserved.
+           * SPDX-License-Identifier: {license}
+           */
+
+      shell:
+        pattern: "*.sh|*.bash|*.zsh"
+        header: |
+          #!/usr/bin/env bash
+          # Copyright (c) {year} {author}. All rights reserved.
+          # SPDX-License-Identifier: {license}
+
+      nix:
+        pattern: "*.nix"
+        header: |
+          # Copyright (c) {year} {author}. All rights reserved.
+          # SPDX-License-Identifier: {license}
+
+      yaml:
+        pattern: "*.yml|*.yaml"
+        header: |
+          # Copyright (c) {year} {author}. All rights reserved.
+          # SPDX-License-Identifier: {license}
+
+      html:
+        pattern: "*.html|*.htm"
+        header: |
+          <!--
+           Copyright (c) {year} {author}. All rights reserved.
+           SPDX-License-Identifier: {license}
+          -->
+
+      css:
+        pattern: "*.css|*.scss|*.sass"
+        header: |
+          /**
+           * Copyright (c) {year} {author}. All rights reserved.
+           * SPDX-License-Identifier: {license}
+           */
+
+      sql:
+        pattern: "*.sql"
+        header: |
+          -- Copyright (c) {year} {author}. All rights reserved.
+          -- SPDX-License-Identifier: {license}
+
+      markdown:
+        pattern: "*.md|*.mdc"
+        header: |
+          <!--
+           Copyright (c) {year} {author}. All rights reserved.
+           SPDX-License-Identifier: {license}
+          -->
+
+variables:
+  - name: year
+    source: current_year
+  - name: author
+    source: git_config
+    key: user.name
+    fallback: "Your Name <your.email@example.com>"
+  - name: license
+    source: project_config
+    key: license
+    fallback: "Proprietary"
+
+exclusions:
+  - pattern: "*.min.js"
+  - pattern: "*.min.css"
+  - pattern: "vendor/*"
+  - pattern: "node_modules/*"
+  - pattern: "*.lock"
+  - pattern: "*.sum"
+  - pattern: "dist/*"
+  - pattern: "build/*"
+  - pattern: ".git/*"
+
+validation:
+  - type: check_existing_header
+    description: Don't add header if one already exists
+    patterns:
+      - "Copyright"
+      - "SPDX-License-Identifier"
+      - "@license"
+
+  - type: preserve_shebang
+    description: Ensure shebang lines remain at the top for scripts
+    files: ["*.sh", "*.py", "*.rb", "*.pl"]
+
+examples:
+  - file: "src/main.go"
+    result: |
+      // Copyright (c) 2025 John Doe <john@example.com>. All rights reserved.
+      // SPDX-License-Identifier: MIT
+      
+      package main
+
+  - file: "utils/helper.py"
+    result: |
+      #!/usr/bin/env python3
+      # Copyright (c) 2025 John Doe <john@example.com>. All rights reserved.
+      # SPDX-License-Identifier: MIT
+      
+      import os
+
+  - file: "config.nix"
+    result: |
+      # Copyright (c) 2025 John Doe <john@example.com>. All rights reserved.
+      # SPDX-License-Identifier: MIT
+      
+      { pkgs, ... }:
+
+metadata:
+  priority: high
+  version: 1.0
+  inspired_by: "ghuntley.com/stdlib"
+</rule>

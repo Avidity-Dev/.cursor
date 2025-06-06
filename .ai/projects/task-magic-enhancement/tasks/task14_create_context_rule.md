@@ -23,8 +23,8 @@ Create new context.mdc rule for managing context folders
   - Types of information to store
   - File naming conventions
   - Context document templates
-  - Best practices for context preservationjlol9;0
-- Include examples of good context document.y7y7j7y/[]
+  - Best practices for context preservation
+- Include examples of good context document.
 - Define when to create vs update context
 
 ## Test Strategy

@@ -3,3 +3,189 @@ description:
 globs:
 alwaysApply: false
 ---
+# Rule Writing Meta
+
+Meta-rule for writing, updating, and evolving Cursor rules to build a comprehensive stdlib.
+
+<rule>
+name: rule_writing_meta
+description: Guidelines for creating and maintaining Cursor rules
+filters:
+  - type: context
+    pattern: "rule_creation|rule_update|learning_capture"
+
+principles:
+  - name: cursor_writes_rules
+    description: |
+      Cursor should write its own rules. When you:
+      - Solve a new problem → Ask Cursor to write a rule
+      - Fix a mistake → Ask Cursor to update the rule
+      - Learn a pattern → Ask Cursor to capture it in a rule
+      
+      Example prompts:
+      - "Write a Cursor rule that captures how to [pattern/solution]"
+      - "Update the [rule-name] rule to prevent [mistake] in the future"
+      - "Create a rule for [specific technology/pattern] based on what we just did"
+
+  - name: continuous_improvement
+    description: |
+      Rules are living documents that improve with experience:
+      1. Start with a basic rule
+      2. When it fails, update it with the learning
+      3. When you find edge cases, add them to examples
+      4. When patterns emerge, extract them to new rules
+
+  - name: atomic_and_composable
+    description: |
+      Each rule should:
+      - Solve ONE specific problem well
+      - Be composable with other rules
+      - Have clear inputs and outputs
+      - Include concrete examples
+
+rule_structure:
+  required_sections:
+    - metadata:
+        description: "YAML frontmatter with description and globs"
+        example: |
+          ---
+          description: Brief description of what this rule does
+          globs: "*.py"  # or "*" for all files
+          ---
+
+    - title:
+        description: "Clear, descriptive title"
+        format: "# {Category} {Specific Purpose}"
+
+    - rule_block:
+        description: "Main rule content in <rule> tags"
+        structure: |
+          <rule>
+          name: snake_case_rule_name
+          description: One-line description
+          filters:
+            - type: {file_extension|event|context}
+              pattern: "{pattern}"
+          
+          {content_sections}
+          
+          metadata:
+            priority: {critical|high|medium|low}
+            version: {semver}
+            {additional_metadata}
+          </rule>
+
+  content_patterns:
+    - pattern: configuration_driven
+      when: "Rule needs to be configurable"
+      example: |
+        configuration:
+          setting_name: default_value
+          options:
+            - option_1
+            - option_2
+
+    - pattern: action_based
+      when: "Rule triggers specific actions"
+      example: |
+        actions:
+          - type: {execute|analyze|validate}
+            command: "{command}"
+            conditions:
+              - {condition}
+
+    - pattern: workflow_based
+      when: "Rule describes a process"
+      example: |
+        workflow:
+          - phase: {phase_name}
+            steps:
+              - name: {step_name}
+                actions:
+                  - "{action}"
+
+    - pattern: example_driven
+      when: "Rule benefits from concrete examples"
+      example: |
+        examples:
+          - scenario: "{description}"
+            input: "{input}"
+            output: "{output}"
+
+writing_guidelines:
+  - guideline: be_specific
+    description: |
+      Use concrete examples, not abstract descriptions
+      Bad: "Handle errors appropriately"
+      Good: "Catch NetworkError and retry 3 times with exponential backoff"
+
+  - guideline: include_anti_patterns
+    description: |
+      Show what NOT to do, not just what to do
+      Include a "don't do this" section when relevant
+
+  - guideline: version_learnings
+    description: |
+      When updating a rule:
+      1. Increment the version
+      2. Add a comment about what changed
+      3. Keep examples from both old and new patterns
+
+  - guideline: cross_reference
+    description: |
+      Reference related rules in metadata:
+      related_rules:
+        - prerequisite: "rule_that_must_run_first"
+        - companion: "rule_that_works_well_together"
+        - alternative: "rule_for_different_approach"
+
+rule_categories:
+  suggested_structure:
+    foundation/: "Core principles and meta-rules"
+    automation/: "Auto-commit, auto-format, auto-license"
+    patterns/: "Code patterns and conventions"
+    testing/: "Test generation and execution"
+    debugging/: "Debugging strategies and tools"
+    deployment/: "Build, package, and deploy"
+    project-specific/: "Project-specific knowledge"
+    technology/: "Language/framework specific rules"
+
+examples:
+  - name: creating_after_solution
+    scenario: "Just solved a tricky Nix build issue"
+    prompt: |
+      "Write a Cursor rule that captures how to build Go applications 
+      with Nix using buildGo, including the vendorHash pattern we just used.
+      Store it in .cursor/rules/technology/nix-go-builds.mdc"
+
+  - name: updating_after_mistake
+    scenario: "Cursor suggested Bazel but you use Nix"
+    prompt: |
+      "Update the build-system rule to specify that this project uses Nix,
+      not Bazel, and include examples of common Nix commands we use"
+
+  - name: extracting_pattern
+    scenario: "Noticed a recurring pattern in API endpoints"
+    prompt: |
+      "Create a rule for our REST API conventions based on the patterns
+      in the /api directory, including naming, error handling, and validation"
+
+evolution_strategy:
+  - stage: initial
+    description: "Basic rule with core functionality"
+    
+  - stage: refined
+    description: "Add examples from real usage"
+    
+  - stage: mature
+    description: "Include edge cases and anti-patterns"
+    
+  - stage: composed
+    description: "Extract common parts to shared rules"
+
+metadata:
+  priority: critical
+  version: 1.0
+  inspired_by: "ghuntley.com/stdlib"
+  note: "This rule should be used to create all other rules"
+</rule>
