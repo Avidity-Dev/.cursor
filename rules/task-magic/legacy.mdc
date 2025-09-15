@@ -1,5 +1,5 @@
 ---
-description: 
+description: This rule specifies the technical details for upgrading projects using the legacy task-magic system to the enhanced system.
 globs: 
 alwaysApply: false
 ---
@@ -25,12 +25,12 @@ This rule provides comprehensive guidance for **upgrading from the original Task
 ### How to Identify Legacy System
 
 **Legacy indicators you'll encounter:**
-- `.ai/tasks/` directory exists (instead of `.ai/projects/{project}/tasks/`)
-- `.ai/TASKS.md` file exists (instead of `.ai/projects/{project}/TASKS.md`)
-- `.ai/plans/PLAN.md` file exists (instead of `.ai/projects/{project}/plan.md`)
-- `.ai/plans/features/` directory exists (instead of `.ai/projects/{project}/context/`)
-- No `.ai/projects/` directory structure
-- No `.ai/INDEX.md` registry file
+- `_parallel/tasks/` directory exists (instead of `_parallel/projects/{project}/tasks/`)
+- `_parallel/TASKS.md` file exists (instead of `_parallel/projects/{project}/TASKS.md`)
+- `_parallel/plans/PLAN.md` file exists (instead of `_parallel/projects/{project}/plan.md`)
+- `_parallel/plans/features/` directory exists (instead of `_parallel/projects/{project}/context/`)
+- No `_parallel/projects/` directory structure
+- No `_parallel/INDEX.md` registry file
 
 ### What the Agent Should Do
 
@@ -60,7 +60,7 @@ When detecting legacy structure:
 - Clear ownership and responsibility
 
 **🔍 Improved Discovery:**
-- Global project registry in `.ai/INDEX.md`
+- Global project registry in `_parallel/INDEX.md`
 - Easy project switching and management
 - Historical context preserved across projects
 
@@ -88,17 +88,17 @@ When detecting legacy structure:
 Before migration, assess what exists:
 
 **Tasks:**
-- Count of active tasks in `.ai/tasks/`
+- Count of active tasks in `_parallel/tasks/`
 - Check for any in-progress tasks
 - Identify task dependencies
 
 **Plans:**
-- Main plan in `.ai/plans/PLAN.md`
-- Feature plans in `.ai/plans/features/`
+- Main plan in `_parallel/plans/PLAN.md`
+- Feature plans in `_parallel/plans/features/`
 - Any archived or draft plans
 
 **Memory:**
-- Existing archives in `.ai/memory/`
+- Existing archives in `_parallel/memory/`
 - Historical logs to preserve
 
 ### Project Identification
@@ -114,7 +114,7 @@ Before migration, assess what exists:
 ### Step 1: Backup Current Structure
 
 ```bash
-# Create backup of current .ai/ directory
+# Create backup of current _parallel/ directory
 cp -r .ai .ai.backup
 ```
 
@@ -127,8 +127,8 @@ cp -r .ai .ai.backup
 
 **Create Directories:**
 ```bash
-mkdir -p .ai/projects/{project-name}/tasks
-mkdir -p .ai/projects/{project-name}/context
+mkdir -p _parallel/projects/{project-name}/tasks
+mkdir -p _parallel/projects/{project-name}/context
 ```
 
 ### Step 3: Migrate Plans
@@ -136,11 +136,11 @@ mkdir -p .ai/projects/{project-name}/context
 **Main Plan Migration:**
 ```bash
 # Move main plan
-mv .ai/plans/PLAN.md .ai/projects/{project-name}/plan.md
+mv _parallel/plans/PLAN.md _parallel/projects/{project-name}/plan.md
 
 # Move feature plans if they exist
-if [ -d ".ai/plans/features" ]; then
-    mv .ai/plans/features/* .ai/projects/{project-name}/context/
+if [ -d "_parallel/plans/features" ]; then
+    mv _parallel/plans/features/* _parallel/projects/{project-name}/context/
 fi
 ```
 
@@ -149,10 +149,10 @@ fi
 **Task Migration:**
 ```bash
 # Move task files
-mv .ai/tasks/* .ai/projects/{project-name}/tasks/
+mv _parallel/tasks/* _parallel/projects/{project-name}/tasks/
 
 # Move task checklist
-mv .ai/TASKS.md .ai/projects/{project-name}/TASKS.md
+mv _parallel/TASKS.md _parallel/projects/{project-name}/TASKS.md
 ```
 
 ### Step 5: Create Project Registry
@@ -166,9 +166,9 @@ This file serves as the central registry for all projects in the Task Magic syst
 ## Active Projects
 
 ### {Project Name}
-- **Path:** `.ai/projects/{project-name}/`
-- **Plan:** [plan.md](mdc:.ai/projects/{project-name}/plan.md)
-- **Tasks:** [TASKS.md](mdc:.ai/projects/{project-name}/TASKS.md)
+- **Path:** `_parallel/projects/{project-name}/`
+- **Plan:** [plan.md](mdc:_parallel/projects/{project-name}/plan.md)
+- **Tasks:** [TASKS.md](mdc:_parallel/projects/{project-name}/TASKS.md)
 - **Status:** Active
 - **Description:** {Brief description of the project}
 
@@ -186,9 +186,9 @@ This file serves as the central registry for all projects in the Task Magic syst
 **Remove Empty Directories:**
 ```bash
 # Remove empty legacy directories
-rmdir .ai/plans/features 2>/dev/null || true
-rmdir .ai/plans 2>/dev/null || true
-rmdir .ai/tasks 2>/dev/null || true
+rmdir _parallel/plans/features 2>/dev/null || true
+rmdir _parallel/plans 2>/dev/null || true
+rmdir _parallel/tasks 2>/dev/null || true
 ```
 
 ### Step 7: Update Cross-References
@@ -203,12 +203,12 @@ rmdir .ai/tasks 2>/dev/null || true
 ### Verification Checklist
 
 **✅ Structure Check:**
-- [ ] `.ai/projects/{project-name}/` exists
-- [ ] `.ai/projects/{project-name}/plan.md` exists and has content
-- [ ] `.ai/projects/{project-name}/TASKS.md` exists and has tasks
-- [ ] `.ai/projects/{project-name}/tasks/` contains task files
-- [ ] `.ai/INDEX.md` exists and lists the project
-- [ ] Legacy directories (`.ai/tasks/`, `.ai/plans/`) are removed or empty
+- [ ] `_parallel/projects/{project-name}/` exists
+- [ ] `_parallel/projects/{project-name}/plan.md` exists and has content
+- [ ] `_parallel/projects/{project-name}/TASKS.md` exists and has tasks
+- [ ] `_parallel/projects/{project-name}/tasks/` contains task files
+- [ ] `_parallel/INDEX.md` exists and lists the project
+- [ ] Legacy directories (`_parallel/tasks/`, `_parallel/plans/`) are removed or empty
 
 **✅ Content Check:**
 - [ ] All task files migrated successfully
@@ -288,42 +288,42 @@ cp -r .ai .ai.backup
 
 # Create structure
 echo "Creating project structure..."
-mkdir -p .ai/projects/$PROJECT_NAME/tasks
-mkdir -p .ai/projects/$PROJECT_NAME/context
+mkdir -p _parallel/projects/$PROJECT_NAME/tasks
+mkdir -p _parallel/projects/$PROJECT_NAME/context
 
 # Migrate plans
-if [ -f ".ai/plans/PLAN.md" ]; then
+if [ -f "_parallel/plans/PLAN.md" ]; then
     echo "Migrating main plan..."
-    mv .ai/plans/PLAN.md .ai/projects/$PROJECT_NAME/plan.md
+    mv _parallel/plans/PLAN.md _parallel/projects/$PROJECT_NAME/plan.md
 fi
 
-if [ -d ".ai/plans/features" ]; then
+if [ -d "_parallel/plans/features" ]; then
     echo "Migrating feature plans..."
-    mv .ai/plans/features/* .ai/projects/$PROJECT_NAME/context/
+    mv _parallel/plans/features/* _parallel/projects/$PROJECT_NAME/context/
 fi
 
 # Migrate tasks
-if [ -d ".ai/tasks" ]; then
+if [ -d "_parallel/tasks" ]; then
     echo "Migrating tasks..."
-    mv .ai/tasks/* .ai/projects/$PROJECT_NAME/tasks/
+    mv _parallel/tasks/* _parallel/projects/$PROJECT_NAME/tasks/
 fi
 
-if [ -f ".ai/TASKS.md" ]; then
+if [ -f "_parallel/TASKS.md" ]; then
     echo "Migrating task checklist..."
-    mv .ai/TASKS.md .ai/projects/$PROJECT_NAME/TASKS.md
+    mv _parallel/TASKS.md _parallel/projects/$PROJECT_NAME/TASKS.md
 fi
 
 # Create registry
 echo "Creating project registry..."
-cat > .ai/INDEX.md << EOF
+cat > _parallel/INDEX.md << EOF
 # Project Index
 
 ## Active Projects
 
 ### $PROJECT_NAME
-- **Path:** \`.ai/projects/$PROJECT_NAME/\`
-- **Plan:** [plan.md](mdc:.ai/projects/$PROJECT_NAME/plan.md)
-- **Tasks:** [TASKS.md](mdc:.ai/projects/$PROJECT_NAME/TASKS.md)
+- **Path:** \`_parallel/projects/$PROJECT_NAME/\`
+- **Plan:** [plan.md](mdc:_parallel/projects/$PROJECT_NAME/plan.md)
+- **Tasks:** [TASKS.md](mdc:_parallel/projects/$PROJECT_NAME/TASKS.md)
 - **Status:** Active
 - **Description:** Migrated from legacy Task Magic structure
 
@@ -338,9 +338,9 @@ EOF
 
 # Clean up
 echo "Cleaning up legacy directories..."
-rmdir .ai/plans/features 2>/dev/null || true
-rmdir .ai/plans 2>/dev/null || true
-rmdir .ai/tasks 2>/dev/null || true
+rmdir _parallel/plans/features 2>/dev/null || true
+rmdir _parallel/plans 2>/dev/null || true
+rmdir _parallel/tasks 2>/dev/null || true
 
 echo "Migration complete! Project: $PROJECT_NAME"
 echo "Backup available at: .ai.backup"
@@ -360,7 +360,7 @@ When an agent encounters legacy structure:
 **Agent Migration Template:**
 
 ```
-I've detected that you're using the legacy Task Magic structure with `.ai/tasks/` and `.ai/plans/`. 
+I've detected that you're using the legacy Task Magic structure with `_parallel/tasks/` and `_parallel/plans/`. 
 
 The enhanced system offers significant benefits:
 - Multi-project support with isolation

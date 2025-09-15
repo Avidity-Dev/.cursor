@@ -1,7 +1,7 @@
 ---
-description: 
+description: How to write journal entries.
 globs: 
-alwaysApply: true
+alwaysApply: false
 ---
 # Journaling Best Practices
 

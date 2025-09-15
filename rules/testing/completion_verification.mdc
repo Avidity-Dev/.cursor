@@ -1,0 +1,348 @@
+---
+description: This rule provides guidance for completing verification testing.
+globs:
+alwaysApply: false
+---
+
+# Completion Verification Testing
+
+## Overview
+
+**Completion Verification Testing** is a systematic approach to ensure complex refactoring tasks, API changes, and architectural migrations are truly complete. Unlike traditional unit tests that verify business logic, this methodology focuses on proving that structural changes have been implemented correctly across the entire codebase.
+
+## Core Principles
+
+### 1. **Positive & Negative Assertions**
+
+Always test both what SHOULD exist and what should NOT exist:
+
+```python
+# ✅ Test what SHOULD be present
+print('✅ new_method exists:', hasattr(obj, 'new_method'))
+
+# ❌ Test what should NOT exist
+print('❌ old_method removed:', not hasattr(obj, 'old_method'))
+```
+
+### 2. **Interface Contract Verification**
+
+Verify API signatures, parameters, and method contracts:
+
+```python
+import inspect
+
+# Check method signatures
+sig = inspect.signature(MyClass.method)
+params = list(sig.parameters.keys())
+print('✅ deprecated_param removed:', 'deprecated_param' not in params)
+print('✅ new_param added:', 'new_param' in params)
+```
+
+### 3. **Configuration State Validation**
+
+Ensure configuration models and settings reflect changes:
+
+```python
+# Check Pydantic models
+fields = MySettings.model_fields.keys()
+print('✅ legacy_field removed:', 'legacy_field' not in fields)
+print('✅ new_field added:', 'new_field' in fields)
+```
+
+### 4. **Cross-Module Consistency**
+
+Verify changes propagated across all affected modules:
+
+```python
+# Check multiple implementations
+for module in [module_a, module_b, module_c]:
+    print(f'✅ {module.__name__} updated:', hasattr(module, 'new_interface'))
+```
+
+## Implementation Template
+
+Create a verification script following this pattern:
+
+```python
+#!/usr/bin/env python3
+"""
+Completion Verification: [TASK_NAME]
+=====================================
+Verifies that [TASK_DESCRIPTION] has been completely implemented.
+"""
+
+def verify_task_completion():
+    """Comprehensive verification of task completion."""
+    print('=== TASK [ID]: [NAME] COMPLETION VERIFICATION ===\n')
+
+    # 1. Core Component Changes
+    print('1. [Component Name] Changes:')
+    # Add specific verifications here
+
+    # 2. Interface Updates
+    print('\n2. Interface Changes:')
+    # Verify interface contracts
+
+    # 3. Configuration Updates
+    print('\n3. Configuration Changes:')
+    # Check config models
+
+    # 4. Cross-Module Consistency
+    print('\n4. Cross-Module Verification:')
+    # Verify propagation across modules
+
+    print('\n=== TASK STATUS: ✅ COMPLETE ===')
+    print('\nAll changes successfully implemented:')
+    print('- [Change 1 description]')
+    print('- [Change 2 description]')
+    print('- [Change 3 description]')
+
+if __name__ == "__main__":
+    verify_task_completion()
+```
+
+## Integration with \_parallel System
+
+### Task File Integration
+
+Add verification section to task files in `_parallel/projects/{project}/tasks/`:
+
+````markdown
+## Completion Verification
+
+```python
+# Run this to verify task completion
+python -c "
+import sys
+sys.path.append('src')
+
+# Verification code here
+print('✅ Task verified complete')
+"
+```
+````
+
+### Memory System Integration
+
+When archiving tasks to `_parallel/projects/{project}/memory/`, include verification results:
+
+```markdown
+## Task Completion Evidence
+
+- Verification script passed: ✅
+- All assertions successful: ✅
+- Cross-module consistency confirmed: ✅
+- Breaking changes properly implemented: ✅
+```
+
+### Progress Tracking Integration
+
+Update `_parallel/projects/{project}/progress_log.md` with verification status:
+
+```markdown
+### 2025-01-XX: Task Completion Verification
+
+- **Verification Method**: Completion Verification Testing
+- **Status**: ✅ All checks passed
+- **Components Verified**: [list]
+- **Breaking Changes Confirmed**: [list]
+```
+
+## When to Use This Pattern
+
+### Perfect For:
+
+- **Complex Refactoring** - Removing dual code paths, method renames
+- **API Breaking Changes** - Parameter removal, interface updates
+- **Architecture Migrations** - Legacy → modern pattern transitions
+- **Cross-Module Changes** - Changes spanning multiple files/layers
+- **Dependency Updates** - Library migrations, version upgrades
+
+### Not Suitable For:
+
+- Business logic testing (use unit tests)
+- Performance testing (use benchmarks)
+- Integration testing (use integration tests)
+- User acceptance testing (use E2E tests)
+
+## Advanced Patterns
+
+### 1. **Grep-Based Verification**
+
+Ensure no legacy references remain:
+
+```python
+import subprocess
+
+def verify_no_legacy_references():
+    """Ensure legacy patterns completely removed."""
+    legacy_patterns = ['old_method', 'deprecated_param', 'legacy_config']
+
+    for pattern in legacy_patterns:
+        result = subprocess.run(['grep', '-r', pattern, 'src/'],
+                              capture_output=True, text=True)
+        if result.returncode == 0:
+            print(f'❌ Found legacy reference: {pattern}')
+            print(result.stdout)
+        else:
+            print(f'✅ No legacy references to: {pattern}')
+```
+
+### 2. **Import Verification**
+
+Verify import paths still work after refactoring:
+
+```python
+def verify_imports():
+    """Test that all imports still work after refactoring."""
+    import_tests = [
+        'from new.module import NewClass',
+        'from updated.service import UpdatedService',
+    ]
+
+    for import_test in import_tests:
+        try:
+            exec(import_test)
+            print(f'✅ Import successful: {import_test}')
+        except ImportError as e:
+            print(f'❌ Import failed: {import_test} - {e}')
+```
+
+### 3. **Configuration Validation**
+
+Ensure config files are valid after changes:
+
+```python
+def verify_config_validity():
+    """Verify configuration files are still valid."""
+    try:
+        from domain.config.config_loader import config
+        print('✅ Configuration loads successfully')
+
+        # Test specific config sections
+        assert hasattr(config, 'new_section'), "New config section missing"
+        assert not hasattr(config, 'old_section'), "Old config section still present"
+
+        print('✅ Configuration structure verified')
+    except Exception as e:
+        print(f'❌ Configuration validation failed: {e}')
+```
+
+## Best Practices
+
+### 1. **Executable Documentation**
+
+The verification script becomes living proof of what changed:
+
+```python
+# This script serves as both verification AND documentation
+print('Changes implemented in this task:')
+print('1. Removed legacy method X (✅ verified)')
+print('2. Updated interface Y (✅ verified)')
+print('3. Migrated config Z (✅ verified)')
+```
+
+### 2. **Stakeholder Communication**
+
+Clear ✅/❌ output shows exactly what was accomplished:
+
+```python
+# Output designed for non-technical stakeholders
+print('MIGRATION STATUS REPORT')
+print('======================')
+print('Legacy system removal: ✅ COMPLETE')
+print('New system integration: ✅ COMPLETE')
+print('Configuration updates: ✅ COMPLETE')
+```
+
+### 3. **Regression Prevention**
+
+Scripts can be run anytime to ensure changes stick:
+
+```python
+# Add to CI/CD pipeline or run periodically
+def regression_check():
+    """Ensure refactoring hasn't regressed."""
+    # Run all verification checks
+    # Fail build if any check fails
+    pass
+```
+
+### 4. **Debugging Aid**
+
+When something breaks, you know exactly which contract was violated:
+
+```python
+# Detailed failure reporting
+def detailed_verification():
+    """Provide detailed failure information."""
+    checks = [
+        ('Method removal', lambda: not hasattr(obj, 'old_method')),
+        ('Interface update', lambda: 'new_param' in get_signature(obj.method)),
+        ('Config migration', lambda: 'new_field' in ConfigModel.model_fields),
+    ]
+
+    for name, check in checks:
+        try:
+            result = check()
+            status = '✅' if result else '❌'
+            print(f'{status} {name}: {"PASS" if result else "FAIL"}')
+        except Exception as e:
+            print(f'❌ {name}: ERROR - {e}')
+```
+
+## Example: Real-World Usage
+
+Here's the actual verification script used for Task 23 (Remove Legacy Entity Resolution):
+
+```python
+# Final verification of Task 23 completion status
+print('=== TASK 23 COMPLETION VERIFICATION ===\n')
+
+import sys
+sys.path.append('src')
+
+# 1. Check EntityResolutionRepository
+from infrastructure.persistence.repositories.entity_resolution_repository import EntityResolutionRepository
+repo = EntityResolutionRepository()
+
+print('1. EntityResolutionRepository Changes:')
+print('   ✅ get_hco_match_universe method exists:', hasattr(repo, 'get_hco_match_universe'))
+print('   ✅ get_hco_match_universe_dbt method removed:', not hasattr(repo, 'get_hco_match_universe_dbt'))
+
+# 2. Check EntityResolutionService
+from application.services.entity_resolution.entity_resolution_service import EntityResolutionService
+import inspect
+
+sig = inspect.signature(EntityResolutionService.__init__)
+params = list(sig.parameters.keys())
+
+print('\n2. EntityResolutionService Changes:')
+print('   ✅ Constructor parameters:', params)
+print('   ✅ use_dbt parameter removed:', 'use_dbt' not in params)
+
+# 3. Check EntityResolutionRepositoryInterface
+from domain.repositories.entity_resolution_repository_interface import EntityResolutionRepositoryInterface
+interface_methods = [method for method in dir(EntityResolutionRepositoryInterface) if not method.startswith('_')]
+
+print('\n3. EntityResolutionRepositoryInterface Changes:')
+print('   ✅ get_hco_match_universe method exists:', 'get_hco_match_universe' in interface_methods)
+print('   ✅ get_hco_match_universe_dbt method removed:', 'get_hco_match_universe_dbt' not in interface_methods)
+
+# 4. Check DbtSettings
+from domain.config.models import DbtSettings
+dbt_settings_fields = DbtSettings.model_fields.keys()
+
+print('\n4. DbtSettings Changes:')
+print('   ✅ fallback_enabled field removed:', 'fallback_enabled' not in dbt_settings_fields)
+
+print('\n=== TASK 23 STATUS: ✅ COMPLETE ===')
+print('\nAll core changes have been successfully implemented:')
+print('- Legacy get_hco_match_universe() method removed (149 lines)')
+print('- get_hco_match_universe_dbt() renamed to get_hco_match_universe()')
+print('- use_dbt parameter removed from EntityResolutionService')
+print('- fallback_enabled removed from DbtSettings')
+print('- Interface updated to remove get_hco_match_universe_dbt()')
+```
+
+This approach provides confidence that complex refactoring tasks are truly complete, not just "mostly done" with hidden edge cases waiting to cause problems later.

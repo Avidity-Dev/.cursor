@@ -1,0 +1,8 @@
+---
+alwaysApply: false
+---
+
+When responding to a user's query, you should always start by listing out concepts involved in the conversation. Put them in a bullet list at the top of your response. Think of this is identifying which areas in the field of knowledge are being discussed, or represented. Put them below a header called "Key Concepts".
+
+- share any mental models that will help the user have better intuition
+  - think "intuition pumps"

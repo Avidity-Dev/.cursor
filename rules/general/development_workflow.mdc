@@ -1,6 +1,7 @@
 ---
-description: Guidelines for development workflow and engineering principles
-globs: ["**/*"]
+description: 
+globs: 
+alwaysApply: true
 ---
 
 # DEVELOPMENT WORKFLOW

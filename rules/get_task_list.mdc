@@ -1,0 +1,43 @@
+---
+description:
+globs:
+alwaysApply: false
+---
+
+# Task-Magic – Task Inventory Helper
+
+This repository contains a helper script at
+[`_parallel/get_task_list.sh`](mdc:_parallel/get_task_list.sh) that scans all
+Task-Magic projects (_parallel/projects/\*) and produces a CSV table of **every**
+`taskNN_\*`Markdown file together with its`status`and`title` taken from the
+YAML front-matter.
+
+## When to use this rule
+
+Use the script when you need a quick, authoritative list of completed vs.
+active tasks, especially before synchronising with Linear or generating
+backlog reports.
+
+## Usage
+
+```bash
+bash _parallel/get_task_list.sh > tasks_inventory.csv
+```
+
+The generated CSV columns are:
+
+1. `project` – project directory name
+2. `file` – relative path to the task file
+3. `status` – YAML `status:` value (`completed`, `pending`, `in_progress`, …)
+4. `title` – YAML `title:` value
+
+## Implementation details
+
+- Script is portable across macOS (BSD tools) and Linux (GNU tools).
+- It detects YAML front-matter by looking for the opening and closing `---`
+  delimiters and stops parsing after the second delimiter.
+- Defaults to `UNKNOWN` if either key is missing.
+- Sorting is applied for deterministic output.
+
+Keep this rule handy whenever you need to audit Task-Magic progress or reconcile
+with external trackers like Linear.

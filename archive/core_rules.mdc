@@ -1,0 +1,16 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+**RULE 1:** State Rules
+
+When applying any rule, explicitly state which rule(s) you're applying in your output (DO NOT STATE THIS ONE!). You may abbreviate the rule description. This rule DOES NOT apply to files, only to chat interface. Do not write "# Applying rule:..." in any code or markdown file.
+
+**RULE 2:** Sym Links
+
+Every project should have a sym link to the following two directories:
+- `~/git/.cursor/` as `.cursor`
+- `~/Documents/Brain5/dev/` as `.dev`
+
+

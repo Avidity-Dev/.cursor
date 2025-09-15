@@ -1,0 +1,9 @@
+---
+description: Documentation coverage guidance for CI/CD; do not block pipelines on doc coverage
+---
+
+## Documentation Coverage & CI/CD
+
+- Do not make documentation coverage a hard gate in CI/CD.
+- Surface coverage metrics and warnings, but allow merges when code quality and tests pass.
+- Encourage iterative improvements to docs in follow-up changes.

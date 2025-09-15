@@ -1,0 +1,143 @@
+---
+description: Guidelines for creating Cursor commands and workflows
+---
+
+# Cursor Commands Creation Guide
+
+## Overview
+
+Cursor commands are reusable workflows defined as **Markdown files** in the `.cursor/commands` directory. They appear when you type `/` in chat and help standardize processes across teams.
+
+## Command Structure
+
+### Location and Naming
+
+- Store commands in `.cursor/commands/` directory
+- Use `.md` file extension (e.g., `create-pr.md`, `run-tests.md`)
+- Use descriptive, kebab-case names for files
+- Commands automatically appear in chat when typing `/`
+
+### Format Requirements
+
+- **Plain Markdown content** describing the workflow
+- **NOT executable scripts** - these are instructions for AI, not shell commands
+- Structure with clear sections: Overview, Steps, Checklists
+- Include practical examples and common pitfalls
+
+## Best Practices
+
+### Content Structure
+
+```markdown
+# Command Name
+
+## Overview
+
+Brief description of what this command accomplishes
+
+## Steps
+
+1. **Step name**
+
+   - Detailed instructions
+   - Sub-tasks and considerations
+
+2. **Next step**
+   - More instructions
+   - Code examples if needed
+
+## Checklist
+
+- [ ] Task 1
+- [ ] Task 2
+- [ ] Verification steps
+```
+
+### Writing Effective Commands
+
+- **Be specific and actionable** - provide concrete steps
+- **Include context** - explain why certain approaches are recommended
+- **Address common issues** - document known problems and solutions
+- **Use checklists** - help ensure all steps are completed
+- **Provide alternatives** - offer different approaches for different scenarios
+
+## Common Command Types
+
+### Development Workflows
+
+- Code reviews and quality checks
+- Testing and deployment procedures
+- Feature setup and scaffolding
+- Bug investigation and fixes
+
+### Git and CI/CD
+
+- Creating pull requests with proper descriptions
+- Branch management and cleanup
+- Release preparation and tagging
+- Deployment verification
+
+### Project Management
+
+- Onboarding new team members
+- Documentation updates
+- Security audits and compliance
+- Performance optimization
+
+## Shell Command Integration
+
+When commands need to reference shell commands:
+
+### ✅ Correct Approach
+
+````markdown
+3. **Create PR with simple description**
+   ```bash
+   gh pr create --title "feat: brief description" --body "Simple description"
+   ```
+````
+
+```
+
+### ❌ Avoid These Mistakes
+- Creating executable bash/shell scripts instead of markdown
+- Complex shell commands with special characters in descriptions
+- Very long command lines that exceed shell parsing limits
+- Backticks or parentheses in command arguments that confuse shell parsing
+
+## Directory Structure Example
+
+```
+
+.cursor/
+└── commands/
+├── create-pr.md
+├── code-review.md
+├── run-tests.md
+├── deploy-staging.md
+└── onboard-developer.md
+
+```
+
+## Integration with Cursor
+
+- Commands integrate with Cursor's AI to provide contextual workflows
+- Use `/command-name` to trigger specific workflows
+- Commands help maintain consistency across team members
+- Can reference project-specific tools, scripts, and procedures
+
+## Command Maintenance
+
+- **Keep commands current** with project changes
+- **Update based on team feedback** and common issues
+- **Version control commands** with the rest of the codebase
+- **Document command changes** in commit messages
+- **Review periodically** to ensure relevance and accuracy
+
+## References
+
+- [Official Cursor Commands Documentation](https://docs.cursor.com/en/agent/chat/commands)
+- Store commands as markdown files, not executable scripts
+- Focus on describing workflows and best practices
+- Use consistent formatting and structure across all commands
+```

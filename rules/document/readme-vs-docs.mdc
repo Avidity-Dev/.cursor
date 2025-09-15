@@ -1,0 +1,72 @@
+---
+description: This rule describes when to add documentation to a `README.md` file or to a guide in the `docs/` directory.
+globs: 
+alwaysApply: false
+---
+**Rule Name:** readme-vs-docs
+
+**Description:**
+
+Provides clear heuristics for deciding what content belongs in the top-level `README.md` versus long-form documentation housed in the `docs/` directory (or another dedicated docs site). The goal is to keep the repository landing page concise and newcomer-friendly while preserving depth for existing users and contributors.
+
+---
+
+## Core Principle
+
+> If the content belongs in the elevator pitch or the "five-minute-install" demo, keep it in `README.md`.
+> If it explains **how** or **why** once the reader is already on board, move it under `docs/` (or another long-form docs location).
+
+---
+
+## What ALWAYS belongs in `README.md`
+
+| Section | Rationale | Typical Length |
+|---------|-----------|----------------|
+| **Project purpose / tagline** | The **"why should I care?"** hook that sells the project. | 1–2 sentences |
+| **Status badges** | Build, release, coverage – users glance here first. | 1 line |
+| **Quick start / install** | Fast-path from clone → "Hello World". | ≤ 15 lines |
+| **Basic usage example** | Shows the API in action; builds confidence. | Short snippet |
+| **Pointer to further docs** | Links to `/docs`, wiki, or external site. | 1 line |
+
+These guidelines mirror GitHub's own [README recommendations](mdc:https:/docs.github.com/en). Keep the file short enough to scan in under a minute.
+
+---
+
+## What NEVER belongs in `README.md`
+
+| Move it to… | Because… |
+|-------------|----------|
+| `docs/architecture/` | Design rationales, diagrams, ADRs – too heavy for newcomers. |
+| `docs/api/` | Auto-generated or hand-written API reference balloons file size. |
+| `docs/guides/` | Step-by-step tutorials clutter the quick-start. |
+| `docs/faq.md` | Edge-case laundry lists drown the headline message. |
+| `CHANGELOG.md` | Version history is for existing users, not first-timers. |
+
+---
+
+## Practical Heuristics
+
+1. **Seven-scroll rule** – If a section pushes the README past ~7 normal GitHub scrolls, extract it.
+2. **Audience test** – New users → README; existing users/contributors → docs.
+3. **Change frequency** – High-churn reference (e.g., endpoint tables) lives under docs so you can regenerate without rewriting the intro each time.
+4. **Build automation** – Point Sphinx/MkDocs/GitHub Pages at `docs/`; leave README as a friendly landing pad.
+
+---
+
+## Recommended Patterns (choose according to project size)
+
+| Pattern | When it shines | Trade-offs |
+|---------|----------------|-----------|
+| **Everything in README** | Micro-libs (<200 LOC) where deep docs are overkill. | Becomes unwieldy as scope grows. |
+| **README + `docs/` folder** *(default)* | Mid-sized repos; easy GitHub Pages integration; docs travel with code. | Requires discipline to keep links updated. |
+| **README + external site** | Large products needing search, versioning, or themed site. | Extra build/deploy pipeline; risk of doc/source drift. |
+| **README + GitHub Wiki** | Collaborative notes that evolve fast. | Separate repo; harder to PR review. |
+
+---
+
+## TL;DR Cheat-Sheet
+
+* **README** = elevator pitch + one-command install + tiny usage sample + signposts.
+* **`docs/`** = everything after "OK, I'm interested—tell me more."
+
+Follow this split to spare future teammates (and your future self) a lot of **Ctrl-F-induced despair**.

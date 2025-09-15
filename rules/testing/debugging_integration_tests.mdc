@@ -1,0 +1,76 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# Debugging Integration Test Failures: A Case Study
+
+This guide provides a systematic workflow for debugging complex integration test failures, based on a real-world scenario encountered in this project. It covers issues ranging from file corruption and data mismatches to subtle interactions with Python's pickle and module systems.
+
+## Symptom Checklist
+
+If you encounter one of the following errors, this guide is likely relevant:
+
+*   `AttributeError: module 'pytest' has no attribute 'mock'`
+*   `_pickle.UnpicklingError: invalid load key, '\xef'`
+*   `KeyError: "['COLUMN_NAME'] not in index"`
+*   `AttributeError: 'dict' object has no attribute 'predict'`
+*   `AttributeError: Can't get attribute 'MyMockClass' on <module ...>`
+
+## Systematic Debugging Workflow
+
+Follow these steps to diagnose and resolve these issues methodically.
+
+### Step 1: Verify Test Syntax & Basic Mocks
+
+The simplest errors are often in the test code itself.
+
+*   **Symptom**: `AttributeError: module 'pytest' has no attribute 'mock'`
+*   **Cause**: Incorrectly attempting to use a `mock` attribute on the `pytest` object.
+*   **Solution**: Use the `mocker` fixture provided by the `pytest-mock` plugin. Pass `mocker` as an argument to your test function and call `mocker.patch()`.
+
+### Step 2: Ensure Test Artifact Integrity
+
+When tests fail while loading binary files like models, the file itself is the primary suspect.
+
+*   **Symptom**: `_pickle.UnpicklingError: invalid load key, '\xef'`
+*   **Cause**: The file being loaded is not a valid pickle file. This can be due to corruption or, more commonly, incorrect file content like a UTF-8 Byte Order Mark (BOM).
+*   **Diagnosis**:
+    1.  Read the file as text to see if it's a Git LFS pointer or has unexpected characters at the start.
+    2.  Use a hex dump tool (`xxd`) to inspect the first few bytes of the file. A valid pickle file will not start with `ef bf bd`.
+*   **Solution**: Do not manually edit pickle files. Create a script to generate them programmatically. This ensures they are created correctly and documents their contents.
+*   **Project Example**: The `[scripts/recreate_test_model.py](mdc:scripts/recreate_test_model.py)` script was created for this exact purpose.
+
+### Step 3: Check Data Contracts
+
+Once artifacts load, the next layer of errors often involves mismatched data expectations between components.
+
+*   **Symptom**: `KeyError: "['COLUMN_NAME'] not in index"`
+*   **Cause**: A service or function is being passed a DataFrame that is missing a column it expects to find.
+*   **Solution**: Ensure your test data fixtures create objects (like DataFrames) that precisely match the schema required by the code under test. Check the function signature and implementation to see what columns it uses.
+
+### Step 4: Ensure High-Fidelity Test Doubles
+
+When a real component is replaced by a test double (a mock or stub), the double must behave like the real component.
+
+*   **Symptom**: `AttributeError: 'dict' object has no attribute 'predict'`
+*   **Cause**: The code expects an object with a specific method (e.g., a machine learning model with a `.predict()` method), but the test provided a simple dictionary or other object that doesn't have that method.
+*   **Solution**: Create a mock class that properly implements the required interface.
+*   **Best Practice**: Place reusable mock objects in the `tests/helpers` directory. This makes them easily accessible to all tests. See `[tests/helpers/mock_model.py](mdc:tests/helpers/mock_model.py)` for an example.
+
+### Step 5: Respect Python's Import and Pickle Systems
+
+This is the most subtle class of error, arising from the interaction between how a pickled object's location is saved and how Python's import system finds it later.
+
+*   **Symptom**: `AttributeError: Can't get attribute 'MyMockClass' on <module 'pytest.__main__'>`
+*   **Cause**: `pickle.load()` cannot find the definition for the class it's trying to deserialize. This happens when the class was defined in a script (`__main__`) that isn't in Python's path during test execution.
+*   **Solution**:
+    1.  Define the class in a proper, importable module (e.g., `tests/helpers/mock_model.py`).
+    2.  Run the script that generates the pickle file *as a module* from the project root. This gives the script the same "view" of the project structure that your tests have, ensuring the pickled object's path is correct.
+
+*   **Correct Invocation**:
+    ```bash
+    # From the project root directory
+    python -m scripts.recreate_test_model
+    ```
+*   **Anti-Pattern**: Avoid hacking `sys.path` inside your scripts. Running the script as a module is the clean, modern solution that respects your project's packaging structure.

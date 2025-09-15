@@ -1,0 +1,292 @@
+---
+title: Integration Testing & Debugging Guide
+description: This rule provides guidance for creating and debugging integration tests.
+globs:
+alwaysApply: false
+---
+
+# Integration Testing & Debugging Guide
+
+This comprehensive guide covers both **creating robust integration tests** and **systematically debugging their failures**. It combines best practices for test design with real-world debugging workflows based on lessons learned from complex data transformation testing.
+
+---
+
+## 1. Philosophy & Core Principles
+
+Integration tests verify that multiple components collaborate correctly through their _public_ interfaces. They deliberately exercise real boundaries—filesystems, databases, external services—unless those boundaries make tests slow or brittle.
+
+### Key Questions Before Writing an Integration Test
+
+1. _What observable behavior am I verifying?_
+2. _Can the test survive a complete rewrite of the implementation?_
+3. _Is this the simplest test that provides confidence?_
+
+### The Five Pillars of Integration Testing
+
+| #   | Principle                                | Brief Explanation                                                        |
+| --- | ---------------------------------------- | ------------------------------------------------------------------------ |
+| 1   | **Test behavior, not implementation**    | Assert outputs, side-effects, contracts—not internal steps.              |
+| 2   | **Mock at the boundaries only**          | Stub _external_ systems (DBs, APIs), leave internal function calls real. |
+| 3   | **Keep tests simple & readable**         | Setup <10 lines, clear Arrange-Act-Assert blocks.                        |
+| 4   | **One concept per test**                 | E.g., `test_handles_empty_input`, `test_error_handling`.                 |
+| 5   | **Can-I-delete-the-implementation test** | The test should still make sense if the code is rewritten from scratch.  |
+
+---
+
+## 2. Best Practices for Writing Integration Tests
+
+### 2.1 Test Structure Template
+
+```python
+class TestFunctionIntegration:
+    """Integration tests for [function_name]."""
+
+    def test_basic_happy_path(self):
+        """Test the function works with valid input."""
+        # Arrange: Simple setup
+        input_data = create_simple_test_data()
+
+        # Act: Call the function
+        result = function_under_test(input_data)
+
+        # Assert: Verify behavior
+        assert result is not None
+        assert result.meets_expected_criteria()
+
+    def test_handles_edge_case(self):
+        """Test specific edge case behavior."""
+        # Keep it focused on one edge case
+        pass
+
+    def test_error_handling(self):
+        """Test that errors are handled appropriately."""
+        # Verify the function fails gracefully
+        pass
+```
+
+### 2.2 What to Test vs What to Mock
+
+**✅ Integration Tests Should:**
+
+- Test public APIs/interfaces
+- Verify components work together
+- Test end-to-end workflows
+- Focus on behavior and outcomes
+- Mock external dependencies (databases, APIs, file systems)
+
+**❌ Integration Tests Should NOT:**
+
+- Mock internal method calls
+- Test implementation details
+- Have complex mock behavior configuration
+- Require reading implementation to write the test
+
+### 2.3 Good vs Bad Examples
+
+**✅ Good Example:**
+
+```python
+def test_compare_addresses_returns_correct_structure():
+    result = compare_addresses(hcp_df, hco_df, session, error_handler)
+    assert isinstance(result, DataFrame)
+    assert all(col in result.columns for col in expected_columns)
+```
+
+**❌ Bad Example:**
+
+```python
+def test_compare_addresses_implementation():
+    # Mocking every internal transformation step
+    mock_df.withColumnRenamed.return_value = mock_renamed
+    mock_renamed.select.return_value = mock_selected
+    # ... 20 more lines of mock setup
+```
+
+### 2.4 When to Use Integration vs Unit Tests
+
+**Integration Tests:**
+
+- Test public APIs/interfaces
+- Verify components work together
+- Test end-to-end workflows
+- Focus on behavior and outcomes
+
+**Unit Tests:**
+
+- Test individual functions/methods
+- Test complex algorithms
+- Test edge cases in isolation
+- Mock all external dependencies
+
+### 2.5 Common Pitfalls to Avoid
+
+1. **Over-mocking**: Don't mock things just because you can
+2. **Testing implementation details**: Focus on outcomes, not process
+3. **Brittle tests**: Tests that break when refactoring (without behavior change)
+4. **Unclear failures**: When a test fails, it should be obvious what's broken
+5. **Test complexity**: If you need a debugger to understand the test, it's too complex
+
+---
+
+## 3. Systematic Debugging Workflow
+
+When integration tests fail, follow this systematic approach before diving into source code:
+
+### 3.1 Common Failure Symptom Checklist
+
+If you encounter any of these errors, this debugging workflow applies:
+
+- `AttributeError: module 'pytest' has no attribute 'mock'`
+- `_pickle.UnpicklingError: invalid load key, '\xef'`
+- `KeyError: "['COLUMN_NAME'] not in index"`
+- `AttributeError: 'dict' object has no attribute 'predict'`
+- `AttributeError: Can't get attribute 'MyMockClass' on <module ...>`
+
+### 3.2 Step-by-Step Debugging Process
+
+#### Step 1: Verify Test Syntax & Basic Mocks
+
+**Symptom**: `AttributeError: module 'pytest' has no attribute 'mock'`  
+**Cause**: Incorrectly attempting to use a `mock` attribute on the `pytest` object.  
+**Solution**: Use the `mocker` fixture provided by `pytest-mock`. Pass `mocker` as an argument to your test function and call `mocker.patch()`.
+
+#### Step 2: Ensure Test Artifact Integrity
+
+**Symptom**: `_pickle.UnpicklingError: invalid load key, '\xef'`  
+**Cause**: The file being loaded is not a valid pickle file (corruption or UTF-8 BOM).  
+**Diagnosis**:
+
+1. Read the file as text to check for Git LFS pointers or unexpected characters
+2. Use hex dump (`xxd`) to inspect first bytes - valid pickle won't start with `ef bf bd`
+
+**Solution**: Never manually edit pickle files. Create a script to generate them programmatically.
+
+#### Step 3: Check Data Contracts
+
+**Symptom**: `KeyError: "['COLUMN_NAME'] not in index"`  
+**Cause**: A service/function receives a DataFrame missing expected columns.  
+**Solution**: Ensure test data fixtures create objects that precisely match the schema required by the code under test.
+
+#### Step 4: Ensure High-Fidelity Test Doubles
+
+**Symptom**: `AttributeError: 'dict' object has no attribute 'predict'`  
+**Cause**: Code expects an object with specific methods, but test provided a simple dict/object without those methods.  
+**Solution**: Create a mock class that properly implements the required interface.  
+**Best Practice**: Place reusable mock objects in `tests/helpers/` directory.
+
+#### Step 5: Respect Import & Pickle Systems
+
+**Symptom**: `AttributeError: Can't get attribute 'MyMockClass' on <module 'pytest.__main__'>`  
+**Cause**: `pickle.load()` cannot find the class definition during deserialization.  
+**Solution**:
+
+1. Define the class in a proper, importable module (e.g., `tests/helpers/mock_model.py`)
+2. Run pickle-generating scripts as modules from project root:
+   ```bash
+   python -m scripts.recreate_test_model
+   ```
+
+### 3.3 Quick Reference: Symptom → Solution
+
+| Symptom                                   | Likely Cause                | Recommended Fix             |
+| ----------------------------------------- | --------------------------- | --------------------------- |
+| `module 'pytest' has no attribute 'mock'` | Using nonexistent attribute | Use `mocker` fixture        |
+| `_pickle.UnpicklingError`                 | Corrupt or wrong file       | Re-generate via script      |
+| `KeyError` on DataFrame                   | Missing column              | Match schema exactly        |
+| `'dict' object has no attribute`          | Bad test double             | Create proper mock class    |
+| `Can't get attribute` (pickle)            | Class defined in `__main__` | Define in importable module |
+
+---
+
+## 4. Advanced Testing Techniques
+
+### 4.1 Grep-Based Verification
+
+Ensure refactors removed legacy symbols:
+
+```python
+import subprocess, pathlib
+legacy = ['old_method', 'deprecated_param']
+for pattern in legacy:
+    result = subprocess.run(['grep', '-R', pattern, 'src/'], capture_output=True)
+    assert result.returncode != 0, f"❌ Legacy reference found: {pattern}"
+```
+
+### 4.2 Import Verification
+
+```python
+for stmt in [
+    'from new.module import NewClass',
+    'from updated.service import UpdatedService',
+]:
+    exec(stmt)
+```
+
+### 4.3 Configuration Validation
+
+```python
+from domain.config.config_loader import config
+assert hasattr(config, 'new_section')
+assert not hasattr(config, 'old_section')
+```
+
+### 4.4 Practical Example: Testing Data Transformations
+
+For functions like data transformation services:
+
+```python
+def test_compare_addresses_integration():
+    # Create minimal mock DataFrames with just the needed structure
+    mock_hcp = MagicMock()
+    mock_hcp.columns = ["VID__V", "ADDRESS_LINE_1__V", "LATITUDE__V", "LONGITUDE__V"]
+
+    # Test the public interface
+    result = compare_addresses(mock_hcp, mock_hco, session, error_handler)
+
+    # Verify the contract, not the implementation
+    assert "DISTANCE" in result.columns
+    assert "EXACT_ADDRESS_FLAG" in result.columns
+```
+
+---
+
+## 5. Quality Assurance Checklist
+
+Before considering an integration test complete, verify:
+
+- [ ] Test focuses on behavior, not implementation
+- [ ] Mock setup is minimal (< 10 lines)
+- [ ] Test name clearly describes what's being verified
+- [ ] Test would still make sense if implementation was rewritten
+- [ ] Failure messages would clearly indicate what's broken
+- [ ] Test data matches the schema expected by the code
+- [ ] External dependencies are mocked at boundaries only
+
+---
+
+## 6. Reference Implementation
+
+See `tests/integration/test_compare_addresses_simple.py` for a real-world example that embodies these principles.
+
+---
+
+## 7. Summary
+
+The best integration test is the **simplest test that gives confidence the code works correctly**. When debugging failures, follow the systematic workflow to diagnose issues methodically.
+
+**Key Mantras:**
+
+- Test behavior, not implementation
+- Mock at boundaries only
+- Keep tests simple and readable
+- Debug systematically, not randomly
+
+**When in doubt, ask:**
+
+- "What behavior am I verifying?"
+- "Is this the simplest way to verify it?"
+- "Will this test survive a refactoring?"
+
+Remember: **Simple tests are maintainable tests, and maintainable tests are valuable tests.**
+
+Happy testing! 🧪

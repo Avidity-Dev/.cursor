@@ -8,9 +8,9 @@ graph TD
     B --> B1{Expansion Needed for Any Task?};
     B1 -- Yes --> B2["Define Sub-tasks & Update Parent Task Definitions to Parent Tasks (listing sub-tasks in parent\'s details)"];
     B1 -- No --> C;
-    B2 --> C["Update .ai/TASKS.md with ALL Planned Tasks (Parent Tasks & Sub-tasks)"];
-    C --> D["For Each Task (Parent Task or Sub-task) in .ai/TASKS.md"];
-    D -- Loop --> E[Create/Update Individual task file in .ai/tasks/];
+    B2 --> C["Update _parallel/TASKS.md with ALL Planned Tasks (Parent Tasks & Sub-tasks)"];
+    C --> D["For Each Task (Parent Task or Sub-task) in _parallel/TASKS.md"];
+    D -- Loop --> E[Create/Update Individual task file in _parallel/tasks/];
     E --> F["Populate YAML & Markdown Body in task file (Parent task file updated to reflect parent status & list sub-tasks)"];
     F -- End Loop --> G[All Task Files Created/Updated];
     G --> H{User asks agent to work?};
@@ -24,8 +24,8 @@ graph TD
     M -- Failure --> P["Update YAML status: failed, add error_log"];
     P --> Q[Update TASKS.md entry: failed marker];
     J -- Not Met --> R[Inform User: Dependencies Missing];
-    S{User asks to archive?} --> T[Agent finds completed/failed tasks in .ai/tasks/];
-    T --> U[Move task files to .ai/memory/tasks/];
-    U --> V[Append summary to .ai/memory/TASKS_LOG.md];
-    V --> W[Remove corresponding entries from .ai/TASKS.md];
+    S{User asks to archive?} --> T[Agent finds completed/failed tasks in _parallel/tasks/];
+    T --> U[Move task files to _parallel/memory/tasks/];
+    U --> V[Append summary to _parallel/memory/TASKS_LOG.md];
+    V --> W[Remove corresponding entries from _parallel/TASKS.md];
 ```

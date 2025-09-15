@@ -1,0 +1,225 @@
+---
+description: This rule specifies the technical details for creating the initial folder & file structure for a new repository.
+globs: 
+alwaysApply: false
+---
+# Task Magic Repository Setup
+
+Whenever you use this rule, start your message with the following:
+
+"Initializing Task Magic setup..."
+
+This rule provides step-by-step commands for creating the `_parallel/` directory structure and core files needed for Task Magic in a new repository.
+
+## Setup Commands
+
+Run these commands in your repository root to initialize the Task Magic `_parallel/` directory structure:
+
+### 1. Create Directory Structure
+
+```bash
+# Create main .ai directory structure
+mkdir -p _parallel/{projects,memory/tasks,memory/plans}
+```
+
+### 2. Initialize Core Files
+
+```bash
+# Create global project registry
+cat > _parallel/INDEX.md << 'EOF'
+# Project Index
+
+This file serves as the central registry for all projects in the Task Magic system.
+
+## Active Projects
+
+(No projects yet - create your first project with the Task Magic system)
+
+## Archived Projects
+
+(None yet)
+
+---
+
+*Last updated: $(date -u +"%Y-%m-%dT%H:%M:%SZ")*
+EOF
+
+# Create global memory logs
+cat > _parallel/memory/TASKS_LOG.md << 'EOF'
+# Global Task Archive Log
+
+This file contains a chronological log of all archived tasks from all projects.
+
+---
+
+*Archive log initialized: $(date -u +"%Y-%m-%dT%H:%M:%SZ")*
+EOF
+
+cat > _parallel/memory/PLANS_LOG.md << 'EOF'
+# Global Plan Archive Log
+
+This file contains a chronological log of all archived plans from all projects.
+
+---
+
+*Plan archive initialized: $(date -u +"%Y-%m-%dT%H:%M:%SZ")*
+EOF
+
+cat > _parallel/memory/GLOBAL_MEMORY.md << 'EOF'
+# Global Workspace Memory
+
+This file aggregates knowledge and insights across all projects in the workspace.
+
+## Cross-Project Patterns
+
+*No patterns identified yet*
+
+## Key Learnings
+
+*No learnings captured yet*
+
+## Workspace Insights
+
+*No insights available yet*
+
+---
+
+*Last updated: $(date -u +"%Y-%m-%dT%H:%M:%SZ")*
+EOF
+```
+
+### 3. Create Task Magic README (Optional)
+
+```bash
+cat > _parallel/TASK_MAGIC_README.md << 'EOF'
+# Task Magic Project Management System
+
+This repository uses the Task Magic system for managing complex development projects.
+
+## System Overview
+- **Project Files**: Located in `_parallel/projects/{project-name}/` directories
+- **Global Registry**: `_parallel/INDEX.md` tracks all active projects
+- **Cursor Rules**: Detailed procedures in `.cursor/rules/task-magic/`
+
+## Getting Started
+
+1. Create your first project: Use `@task-magic/project` to create a new project
+2. Create a plan: Use `@task-magic/plan` to create project requirements
+3. Generate tasks: Use `@task-magic/tasks` to break down work into actionable items
+
+For detailed procedures, the Task Magic rules in `.cursor/rules/task-magic/` provide step-by-step guidance.
+EOF
+```
+
+### 4. Create Claude Code Integration Guide
+
+```bash
+cat > CLAUDE.md << 'EOF'
+# Task Magic Project Management System
+
+This repository uses the Task Magic system for managing complex development projects. When working with Task Magic files, Claude Code must follow the established patterns and procedures.
+
+## System Overview
+- **Project Files**: Located in `_parallel/projects/{project-name}/` directories
+- **Global Registry**: `_parallel/INDEX.md` tracks all active projects
+- **Cursor Rules**: Detailed procedures in `.cursor/rules/task-magic/`
+
+## Required Workflow for Task Magic Operations
+
+**🚨 CRITICAL: Always read the appropriate Cursor rule before Task Magic operations**
+
+Before working with Task Magic files, use the Read tool to fetch the relevant rule:
+
+### Task Operations
+```bash
+# Before creating/updating tasks or TASKS.md
+cat /Users/michaelhood/git/.cursor/rules/task-magic/tasks.mdc
+```
+
+### Project Creation/Management
+```bash
+# Before creating projects or PROJECT.md
+cat /Users/michaelhood/git/.cursor/rules/task-magic/project.mdc
+```
+
+### Planning Operations
+```bash
+# Before creating/updating plan.md files
+cat /Users/michaelhood/git/.cursor/rules/task-magic/plan.mdc
+```
+
+### Progress Updates/Handoffs
+```bash
+# Before creating progress updates or handoff documents
+cat /Users/michaelhood/git/.cursor/rules/task-magic/handoff.mdc
+```
+
+### Memory/Archive Operations
+```bash
+# Before archiving tasks or working with memory system
+cat /Users/michaelhood/git/.cursor/rules/task-magic/memory.mdc
+```
+
+## Task Magic Standards
+- **File Naming**: Use `task{id}_{description}.md` format for tasks
+- **YAML Frontmatter**: Include metadata in all task files
+- **Timestamps**: Use `date -u +"%Y-%m-%dT%H:%M:%SZ"` for ISO timestamps
+- **Project Structure**: Follow standardized directory layouts
+- **Status Tracking**: Maintain accurate status in TASKS.md files
+
+## Rule Integration Priority
+1. **Read the specific rule first** using the Read tool
+2. **Follow the procedures** defined in that rule exactly
+3. **Use the templates** and formats specified
+4. **Maintain consistency** with existing Task Magic structure
+
+## Legacy Detection
+If you encounter legacy Task Magic files (`_parallel/tasks/`, `_parallel/TASKS.md`, `_parallel/plans/PLAN.md`), read the migration rule:
+```bash
+cat /Users/michaelhood/git/.cursor/rules/task-magic/legacy.mdc
+```
+EOF
+```
+
+## Verification
+
+After running setup, verify the structure:
+
+```bash
+# Check directory structure
+find .ai -type d | sort
+
+# Verify core files exist
+ls -la _parallel/INDEX.md _parallel/memory/TASKS_LOG.md _parallel/memory/PLANS_LOG.md _parallel/memory/GLOBAL_MEMORY.md
+
+# Verify Task Magic integration files
+ls -la _parallel/TASK_MAGIC_README.md CLAUDE.md
+```
+
+## Expected Structure
+
+After setup, your repository will have:
+
+```
+_parallel/
+  INDEX.md              # Global project registry
+  projects/             # Individual project directories (created as needed)
+  memory/               # Global workspace memory
+    tasks/              # Archived tasks from all projects
+    plans/              # Archived plans from all projects  
+    TASKS_LOG.md        # Global task archive log
+    PLANS_LOG.md        # Global plan archive log
+    GLOBAL_MEMORY.md    # Cross-project knowledge aggregation
+
+  TASK_MAGIC_README.md  # Optional: Integration documentation
+
+CLAUDE.md               # Claude Code integration guide
+```
+
+## Next Steps
+
+1. **Create First Project**: Use `@task-magic/project` to create your first project
+2. **Start Planning**: Use `@task-magic/plan` to create your first project plan
+3. **Generate Tasks**: Use `@task-magic/tasks` to break down work
+
+The Task Magic rule system will guide you through each step with detailed procedures.

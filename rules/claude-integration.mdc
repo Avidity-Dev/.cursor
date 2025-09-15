@@ -1,0 +1,74 @@
+# Claude Code CLI Integration
+
+When a user's prompt ends with `-c`, automatically execute the command using Claude Code CLI instead of responding directly.
+
+## Implementation
+
+When you detect a prompt ending with `-c`:
+
+1. **Extract the core prompt** by removing the `-c` suffix
+2. **Execute the command**: `claude --print "CORE_PROMPT"`
+3. **Return the Claude Code CLI response** to the user
+4. **Do not provide your own response** - let Claude Code CLI handle it
+
+### Enhanced Options
+
+For more complex scenarios, you can use additional flags:
+
+- **JSON Output**: `claude --print --output-format json "PROMPT"` for structured data
+- **Verbose Mode**: `claude --print --verbose "PROMPT"` for detailed debugging
+- **Model Selection**: `claude --print --model sonnet "PROMPT"` for specific models
+- **Permission Mode**: `claude --print --permission-mode plan "PROMPT"` for analysis tasks
+- **Multi-turn**: `claude --print --max-turns 3 "PROMPT"` for complex tasks
+
+## Example Usage
+
+User prompt: `"What is my name?" -c`
+
+- Extract: `"What is my name?"`
+- Execute: `claude --print "What is my name?"`
+- Return Claude's response
+
+User prompt: `"Write a Python function to process data" -c`
+
+- Extract: `"Write a Python function to process data"`
+- Execute: `claude --print "Write a Python function to process data"`
+- Return Claude's response
+
+User prompt: `"Analyze this codebase structure" -c`
+
+- Extract: `"Analyze this codebase structure"`
+- Execute: `claude --print --permission-mode plan "Analyze this codebase structure"`
+- Return Claude's analysis
+
+User prompt: `"Get project data as JSON" -c`
+
+- Extract: `"Get project data as JSON"`
+- Execute: `claude --print --output-format json "Get project data as JSON"`
+- Return structured JSON response
+
+## Technical Details
+
+- Use the `run_terminal_cmd` tool to execute the Claude command
+- Set `is_background: false` to capture the output
+- Handle any errors gracefully and inform the user if Claude Code CLI fails
+- The command should be executed in the current working directory (`/Users/michaelhood/git/parallel`)
+
+### Smart Flag Detection
+
+The rule can intelligently choose flags based on prompt content:
+
+- **Analysis tasks** → `--permission-mode plan`
+- **JSON requests** → `--output-format json`
+- **Debug requests** → `--verbose`
+- **Complex tasks** → `--max-turns 3`
+- **Model-specific** → `--model sonnet` or `--model opus`
+
+## Benefits
+
+This integration allows users to:
+
+- Seamlessly switch between Cursor's AI and Claude Code CLI
+- Leverage Claude Code CLI's project-aware capabilities
+- Maintain workflow continuity within Cursor
+- Access Claude Code CLI's terminal execution features when needed

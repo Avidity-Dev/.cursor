@@ -1,0 +1,144 @@
+---
+description: Instructs the agent how to create Branch Overview Diagrams.
+alwaysApply: false
+---
+
+## Structure Guidelines
+
+### 1. Hierarchical Organization
+
+```mermaid
+flowchart TD
+    A["Main Branch"] --> B["feature/your-branch-name"]
+
+    B --> C["🗂️ Category 1"]
+    B --> D["🔧 Category 2"]
+    B --> E["🧪 Category 3"]
+
+    C --> C1["📄 Specific Implementation"]
+    C --> C2["⚙️ Configuration Changes"]
+```
+
+### 2. Required Elements
+
+- **Root node:** Main branch or repository name
+- **Feature branch:** Current working branch
+- **Categories:** 3-5 major work areas with emoji icons
+- **Implementation details:** Specific files, components, or features
+- **Status section:** Current state and metrics
+
+---
+
+## Visual Conventions
+
+### 3. Emoji Categories
+
+| Category Type       | Emoji  | Purpose                          |
+| ------------------- | ------ | -------------------------------- |
+| **Cleanup/Removal** | 🗑️❌   | Deprecated code, removed files   |
+| **Implementation**  | 🔧⚙️📊 | New features, core logic         |
+| **Testing**         | 🧪✅   | Test files, validation           |
+| **Documentation**   | 📚📋   | README files, guides             |
+| **Configuration**   | ⚙️🔄   | Settings, schedules, definitions |
+| **Data/Schema**     | 📊📋   | Models, schemas, APIs            |
+| **Status**          | 📊📈   | Metrics, current state           |
+
+### 4. Color Coding
+
+```mermaid
+%% Apply colors to categories for visual grouping
+style C fill:#ffebee    %% Light red for cleanup/removal
+style D fill:#e8f5e8    %% Light green for implementation
+style E fill:#fff3e0    %% Light orange for testing
+style F fill:#e3f2fd    %% Light blue for status/info
+```
+
+### 5. Information Density
+
+Include specific technical details:
+
+- **File paths:** `prometheus/dlt/sources/sfmc/models.py`
+- **Component names:** `ContactValues`, `SFMCContactsResponse`
+- **Feature descriptions:** `Schema validation`, `Pagination support`
+- **Metrics:** `Modified: 3 files`, `Untracked: 2 test files`
+
+---
+
+## Template Structure
+
+```mermaid
+flowchart TD
+    A["Main Branch"] --> B["feature/branch-name"]
+
+    B --> C["🗑️ Cleanup Category"]
+    B --> D["🔧 Implementation Category"]
+    B --> E["🧪 Testing Category"]
+    B --> F["📚 Documentation Category"]
+
+    C --> C1["❌ Removed Items<br/>- Specific files<br/>- Legacy components"]
+
+    D --> D1["📊 Core Implementation<br/>path/to/file.py<br/>- Key classes<br/>- Main features"]
+    D --> D2["⚙️ Configuration<br/>config/files<br/>- Settings<br/>- Schedules"]
+
+    E --> E1["🧪 Test Files<br/>tests/test_*.py<br/>- Unit tests<br/>- Integration tests"]
+
+    F --> F1["📚 Documentation<br/>README.md files<br/>- Architecture<br/>- Usage examples"]
+
+    G["📊 Current Status<br/>Modified: X files<br/>Added: Y files<br/>Untracked: Z files"] --> B
+
+    style C fill:#ffebee
+    style D fill:#e8f5e8
+    style E fill:#fff3e0
+    style F fill:#f3e5f5
+    style G fill:#e3f2fd
+```
+
+---
+
+## Best Practices
+
+### 6. Technical Implementation
+
+- **Start with `flowchart TD`** for top-down hierarchy
+- **Use meaningful node IDs** that map to content
+- **Include file paths** where relevant
+- **Show relationships** between components
+- **Add status metrics** for project tracking
+
+### 7. Content Guidelines
+
+- **Be specific:** Include actual file names and class names
+- **Show scope:** Demonstrate the breadth of work accomplished
+- **Highlight impact:** Use visual cues for major changes
+- **Include context:** Show how work fits into larger architecture
+- **Status awareness:** Always include current state information
+
+### 8. Common Use Cases
+
+- **Feature completion summaries**
+- **Sprint review presentations**
+- **Code review preparation**
+- **Knowledge transfer documentation**
+- **Project portfolio updates**
+
+---
+
+## Quick Reference Template
+
+```
+flowchart TD
+    MAIN["Repository"] --> BRANCH["feature/branch-name"]
+
+    BRANCH --> CAT1["🎯 Category 1"]
+    BRANCH --> CAT2["🔧 Category 2"]
+    BRANCH --> STATUS["📊 Status"]
+
+    CAT1 --> DETAIL1["Implementation Details"]
+    CAT2 --> DETAIL2["Technical Specifics"]
+
+    style CAT1 fill:#category-color
+    style CAT2 fill:#category-color
+    style STATUS fill:#e3f2fd
+```
+
+Use this template and adapt the categories, details, and styling to match your specific development work and organizational needs.

@@ -1,0 +1,281 @@
+---
+description: This rule will help you resolve pandas conditional operand type errors (Series | NDArray[bool_]).
+globs: 
+alwaysApply: false
+---
+# Pandas Type Safety and Linter Error Resolution
+
+## The Problem: Pandas Conditional Operand Errors
+
+When working with pandas DataFrames and Series, you may encounter linter errors like:
+```
+Invalid conditional operand of type "Series | NDArray[bool_]"
+Method __bool__ for type "Series" returns type "NoReturn" rather than "bool"
+```
+
+This occurs because pandas functions like `pd.notna()` and `pd.isna()` can return different types depending on their input, creating ambiguity for type checkers.
+
+## Root Cause Analysis
+
+The issue typically manifests in these patterns:
+- `if pd.notna(row[column]):` - Type checker can't determine if this returns a scalar boolean or Series
+- `if pd.isna(row[column]):` - Same ambiguity issue
+- Using `row[column]` directly in pandas null-checking functions when iterating with `iterrows()`
+
+## Proven Solutions
+
+### 1. Helper Method Pattern (Recommended)
+Create a dedicated helper method for safe null checking:
+
+```python
+def _is_valid_value(self, value) -> bool:
+    """Check if a value from a pandas Series is valid (not null/NaN)."""
+    if value is None:
+        return False
+    try:
+        return not pd.isna(value)
+    except (TypeError, ValueError):
+        return value is not None
+```
+
+Then use it like:
+```python
+# Instead of: pd.notna(row[col])
+# Use: self._is_valid_value(row.get(col))
+
+street_val = row.get(address_col)
+street = str(street_val) if self._is_valid_value(street_val) else None
+```
+
+### 2. Use .get() Method
+Always use `row.get(column)` instead of `row[column]` when checking for null values to provide clearer type hints to the checker.
+
+### 3. Avoid Direct pandas Functions in Conditionals
+Don't use `pd.notna()` or `pd.isna()` directly in conditional statements when working with potentially ambiguous types.
+
+## Type Safety Best Practices
+
+### Method Signatures
+Always be explicit about Optional types:
+```python
+# Good
+def _build_output_row(self, original_row: pd.Series, geocoded_address: Optional[Address]) -> Dict[str, Any]:
+
+# Avoid
+def _build_output_row(self, original_row: pd.Series, geocoded_address: Address) -> Dict[str, Any]:
+```
+
+### Coordinate Handling
+When dealing with coordinates that might be None:
+```python
+# Safe unpacking
+if geocoded_address and geocoded_address.has_coordinates:
+    coordinates = geocoded_address.coordinates
+    if coordinates:
+        lat, lng = coordinates
+        # Process coordinates...
+```
+
+### DataFrame Iteration
+When iterating through DataFrames with `iterrows()`:
+```python
+for _, row in df.iterrows():
+    # Use .get() for safer access
+    lat_val = row.get(lat_col)
+    lon_val = row.get(lon_col)
+    
+    # Use helper method for null checking
+    if not self._is_valid_value(lat_val) or not self._is_valid_value(lon_val):
+        continue
+```
+
+## Common Anti-Patterns to Avoid
+
+❌ **Don't do this:**
+```python
+if pd.notna(row[column]):  # Type ambiguity
+if pd.isna(row['lat']) or pd.isna(row['lon']):  # Type ambiguity
+```
+
+✅ **Do this instead:**
+```python
+val = row.get(column)
+if self._is_valid_value(val):  # Clear, type-safe
+    
+lat_val, lon_val = row.get('lat'), row.get('lon')
+if not self._is_valid_value(lat_val) or not self._is_valid_value(lon_val):
+```
+
+## Debugging Strategy
+
+When encountering similar type errors:
+1. **Identify the pattern** - Look for pandas functions used in conditionals
+2. **Create helper methods** - Abstract the problematic logic into dedicated methods
+3. **Use explicit typing** - Make Optional types explicit in method signatures
+4. **Test incrementally** - Fix one pattern at a time to isolate issues
+5. **Validate with mypy** - Use type checker to confirm resolution
+
+## File References
+
+This pattern was successfully applied in [src/application/services/geocoding/geocoder.py](mdc:src/application/services/geocoding/geocoder.py) to resolve multiple conditional operand errors.
+
+## Key Takeaways
+
+- **Type checkers are cautious** - They err on the side of safety when types are ambiguous
+- **Helper methods clarify intent** - They make your code more readable and type-safe
+- **Explicit is better than implicit** - Clear type annotations prevent confusion
+- **pandas + typing requires care** - The dynamic nature of pandas can clash with static type checking
+
+Remember: The goal isn't just to silence the linter, but to write genuinely safer, more maintainable code.
+
+## Advanced Pandas Type Inference Issues
+
+### 4. DataFrame Column Selection Type Confusion
+The type checker sometimes infers column selections as numpy arrays instead of DataFrames:
+
+❌ **Problem:**
+```python
+search_dev = llm_dev[["search_row", "SEARCH_HCO_TYPE", "SEARCH_CLEANED_NAME"]].drop_duplicates()
+# Error: Cannot access attribute "drop_duplicates" for class "ndarray[_Shape, Unknown]"
+```
+
+✅ **Solution:**
+```python
+# Explicitly wrap in pd.DataFrame() to ensure correct type inference
+search_columns = ["search_row", "SEARCH_HCO_TYPE", "SEARCH_CLEANED_NAME"]
+search_dev = pd.DataFrame(llm_dev[search_columns])
+search_dev = search_dev.drop_duplicates().fillna({"SEARCH_HCO_TYPE": "Unknown"})
+```
+
+### 5. Dictionary Operations with pandas.map()
+The type checker doesn't recognize that pandas `.map()` accepts dictionaries:
+
+❌ **Problem:**
+```python
+matched_rows = df["search_row"].map(llm_picks) == df["match_row"]
+# Error: Argument of type "dict[Unknown, Unknown]" cannot be assigned to parameter "func"
+```
+
+✅ **Solution:**
+```python
+# Use the dictionary's .get method instead
+matched_rows = df["search_row"].map(llm_picks.get) == df["match_row"]
+```
+
+### 6. Dictionary Keys with pandas.isin()
+`dict.keys()` returns a view object that pandas doesn't recognize as a sequence:
+
+❌ **Problem:**
+```python
+no_responses = df[~df["search_row"].isin(parsed_responses.keys())]["search_row"]
+# Error: Argument of type "dict_keys[Unknown, Unknown]" cannot be assigned to parameter "values"
+```
+
+✅ **Solution:**
+```python
+# Convert dict_keys to list
+no_responses = df[~df["search_row"].isin(list(parsed_responses.keys()))]["search_row"]
+```
+
+### 7. Series Operations vs numpy Array Confusion
+Type checker sometimes confuses pandas Series methods with numpy array operations:
+
+❌ **Problem:**
+```python
+above_threshold = scores[scores >= threshold]
+if not above_threshold.empty:  # Error: Cannot access attribute "empty"
+    top_matches = above_threshold.nlargest(n)  # Error: Cannot access attribute "nlargest"
+```
+
+✅ **Solution:**
+```python
+above_threshold = scores[scores >= threshold]
+if len(above_threshold) > 0:
+    # Convert to pandas Series for proper method access
+    scores_series = pd.Series(above_threshold, index=candidate_df.index[scores >= threshold])
+    top_matches = scores_series.nlargest(n)
+```
+
+### 8. Coordinate Validation Pattern
+Safe coordinate checking without triggering type inference issues:
+
+❌ **Problem:**
+```python
+valid_coords = df[["SEARCH_LAT", "SEARCH_LON"]].notna().all(axis=1)
+return valid_coords.any()  # Error: Cannot access attribute "any" for class "bool"
+```
+
+✅ **Solution:**
+```python
+# Use individual column operations instead
+has_coords = (df["SEARCH_LAT"].notna() & df["SEARCH_LON"].notna()).sum() > 0
+return bool(has_coords)
+```
+
+### 9. Optional String Parameters
+Avoid passing None to functions expecting strings:
+
+❌ **Problem:**
+```python
+geo_result = geocoder.geolocate(
+    geo_input,
+    address_col="address" if "address" in geo_input.columns else None,  # Error: None not assignable to str
+)
+```
+
+✅ **Solution:**
+```python
+# Build kwargs dictionary, filtering out None values
+geocode_kwargs = {}
+if "address" in geo_input.columns:
+    geocode_kwargs["address_col"] = "address"
+if "city" in geo_input.columns:
+    geocode_kwargs["city_col"] = "city"
+
+geo_result = geocoder.geolocate(geo_input, verbose_output=False, **geocode_kwargs)
+```
+
+### 10. Series.values vs Series.tolist()
+Use `.tolist()` for better type compatibility:
+
+❌ **Problem:**
+```python
+match_values = df[df["search_row"] == k]["match_row"].values
+# Error: Cannot access attribute "values" for class "ndarray[_Shape, Unknown]"
+```
+
+✅ **Solution:**
+```python
+# Use .tolist() which works reliably with type checker
+match_values = df[df["search_row"] == k]["match_row"].tolist()
+```
+
+### 11. Unique Values with Type Safety
+Replace `.unique().tolist()` with set operations when type checker is confused:
+
+❌ **Problem:**
+```python
+unique_values = df["column"].unique().tolist()
+# Error: Cannot access attribute "unique" for class "ndarray[_Shape, Unknown]"
+```
+
+✅ **Solution:**
+```python
+# Use set() for uniqueness instead
+unique_values = list(set(df["column"].tolist()))
+```
+
+## Additional File References
+
+These advanced patterns were successfully applied in [src/application/services/entity_resolution/entity_resolution_service.py](mdc:src/application/services/entity_resolution/entity_resolution_service.py) to resolve complex pandas type inference issues.
+
+## Extended Debugging Checklist
+
+When encountering pandas type errors:
+1. **Column selection issues** → Wrap in `pd.DataFrame()`
+2. **Dictionary mapping errors** → Use `.get` method instead of dict directly
+3. **dict_keys errors** → Convert to `list()` 
+4. **Series/numpy confusion** → Use individual column operations or explicit Series creation
+5. **Optional parameter errors** → Build kwargs dictionary filtering None values
+6. **Array attribute errors** → Use `.tolist()` instead of `.values`
+7. **Complex chained operations** → Break into simpler steps with explicit typing

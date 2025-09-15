@@ -1,0 +1,49 @@
+---
+description: Guidelines for dbt data layer responsibilities, tests, and model patterns for transforms/
+globs: transforms/**
+---
+
+## dbt Data Layer Rules
+
+- dbt owns data quality and transformation; Python domain owns business logic.
+- Use staging→intermediate→marts layers.
+- Prefer views for staging, incremental for expensive intermediates.
+
+### Responsibilities dbt SHOULD own
+
+- Schema validation: not_null, unique, accepted_values, relationships.
+- Data cleansing/standardization: trimming, casing, regex normalization.
+- Referential integrity checks between staging models.
+- Precompute heavy but stable metrics (e.g., coarse distance bounds) with incremental models.
+- Static filters that rarely change may be parameterized via vars (e.g., active status).
+
+### Responsibilities dbt SHOULD NOT own
+
+- Dynamic business rules, confidence scoring, tie-breaking.
+- Manual override decisioning.
+
+### Naming & Columns
+
+- In `stg_*`, alias raw fields to canonical names:
+  - `VID__V` → `hcp_vid` or `hco_vid` based on entity
+  - `ADDRESS.VID__V` → `address_vid`
+  - Provide `primary_address_vid` if available/derivable
+- Avoid leaking raw suffixes (`__V`) past staging.
+
+### Tests
+
+- Add `models/schema.yml` (or per-folder schema.yml) with:
+  - unique + not_null for ids
+  - relationships for foreign keys (e.g., `primary_address_vid` → `stg_addresses.address_vid`)
+  - accepted_values for stable enumerations
+
+### Performance
+
+- Avoid full cross joins for distances. Bound by:
+  - shared zip/state, bounding box, or H3 cells
+  - use Snowflake GEOGRAPHY + ST_DISTANCE when available
+- Use incremental + clustering/ordering keys where helpful.
+
+### Exposures
+
+- Expose marts powering application reads (e.g., `matching_candidates`).

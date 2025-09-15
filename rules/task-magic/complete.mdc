@@ -1,0 +1,219 @@
+---
+description: This rule explains actions the agent should take upon task completion.
+globs: 
+alwaysApply: false
+---
+# Task Completion & Archive Rule
+
+Whenever you use this rule, start your message with the following:
+
+"Processing task completion and archival..."
+
+This rule automates the multi-step process of marking tasks as completed and archiving them to project memory.
+
+## Trigger Conditions
+
+This rule activates when:
+1. A task file in `_parallel/projects/{project}/tasks/` is modified
+2. The task's YAML status is `in-progress`
+3. The file contains completion indicators (COMPLETED, DONE, Task completed, ## Completion section)
+
+## Automated Workflow
+
+When triggered, this rule performs the following operations in sequence:
+
+### 1. Update Task Metadata
+
+First, read the current task file and update its YAML frontmatter:
+
+```bash
+# Generate UTC timestamp
+TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+
+# Update task file frontmatter
+- status: in-progress → status: completed
+- completed_at: null → completed_at: $TIMESTAMP
+- assigned_agent: {value} → assigned_agent: null
+```
+
+### 2. Synchronize TASKS.md
+
+Update the project's master checklist to reflect completion:
+
+1. Read `_parallel/projects/{project}/TASKS.md`
+2. Find the corresponding task entry (by ID and title)
+3. Replace `- [-]` with `- [x]` for that specific task
+4. Preserve all other content and formatting
+
+### 3. Archive Task File
+
+Move the completed task to project memory:
+
+```bash
+# Ensure memory directory exists
+mkdir -p _parallel/projects/{project}/memory/tasks/
+
+# Move task file to archive
+mv _parallel/projects/{project}/tasks/task{id}_{name}.md \
+   _parallel/projects/{project}/memory/tasks/
+```
+
+### 4. Update Archive Log
+
+Append completion record to project's TASKS_LOG.md:
+
+```markdown
+- task{id}_{name}: Completed at {timestamp} - {brief_description}
+```
+
+### 5. Update Project Status
+
+Update the project's STATUS.md to reflect the completion:
+
+1. Read `_parallel/projects/{project}/STATUS.md`
+2. Calculate new metrics:
+   - Decrement "Active Tasks" count
+   - Increment "Completed Tasks" count
+   - Update "Next Priority" if this was the priority task
+   - Update "Last Updated" timestamp
+3. Regenerate the status snapshot with current information
+
+### 6. Extract Insights (Optional)
+
+If the task contains significant learnings or architectural decisions:
+
+1. Read `_parallel/projects/{project}/memory/MEMORY.md`
+2. Extract key insights from the completed task
+3. Update relevant sections (Key Learnings, Technical Discoveries, etc.)
+4. Preserve existing structure and content
+
+## Implementation Pattern
+
+```yaml
+action: |
+  # Step 1: Get project context from file path
+  project=$(echo $file_path | sed 's|.*/projects/\([^/]*\)/.*|\1|')
+  
+  # Step 2: Generate timestamp
+  timestamp=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+  
+  # Step 3: Update task file metadata
+  read_file($file_path)
+  edit_file($file_path, 
+    old: "status: in-progress",
+    new: "status: completed"
+  )
+  edit_file($file_path,
+    old: "completed_at: null",
+    new: "completed_at: $timestamp"
+  )
+  edit_file($file_path,
+    old: "assigned_agent: .*",
+    new: "assigned_agent: null"
+  )
+  
+  # Step 4: Update TASKS.md checkbox
+  task_id=$(grep "^id:" $file_path | cut -d' ' -f2)
+  task_title=$(grep "^title:" $file_path | sed 's/title: //')
+  
+  read_file("_parallel/projects/$project/TASKS.md")
+  edit_file("_parallel/projects/$project/TASKS.md",
+    old: "- [-] $task_id: $task_title",
+    new: "- [x] $task_id: $task_title"
+  )
+  
+  # Step 5: Ensure archive directory exists
+  mkdir -p "_parallel/projects/$project/memory/tasks/"
+  
+  # Step 6: Archive task file
+  task_filename=$(basename $file_path)
+  mv $file_path "_parallel/projects/$project/memory/tasks/$task_filename"
+  
+  # Step 7: Update archive log
+  append_file("_parallel/projects/$project/memory/TASKS_LOG.md",
+    "- $task_filename: Completed at $timestamp"
+  )
+  
+  # Step 8: Update STATUS.md
+  read_file("_parallel/projects/$project/STATUS.md")
+  
+  # Calculate new metrics
+  active_count=$(grep -c "^- \[-\]" "_parallel/projects/$project/TASKS.md")
+  completed_count=$(grep -c "^- \[x\]" "_parallel/projects/$project/TASKS.md")
+  total_count=$((active_count + completed_count))
+  
+  # Find next priority task
+  next_task=$(grep "^- \[-\]" "_parallel/projects/$project/TASKS.md" | head -1 | sed 's/^- \[-\] //')
+  
+  # Regenerate STATUS.md with updated information
+  edit_file("_parallel/projects/$project/STATUS.md",
+    full_rewrite: true,
+    content: |
+      # Current Status – $project
+      
+      **Last Updated**: $timestamp
+      
+      ## At-a-Glance
+      
+      | Metric           | Value                           |
+      | ---------------- | ------------------------------- |
+      | Active Tasks     | $active_count tasks remaining   |
+      | Completed Tasks  | $completed_count / $total_count |
+      | Next Priority    | $next_task                      |
+      | Blockers         | None                            |
+      | Target Milestone | See plan.md                     |
+      
+      ## High-Level Goal
+      
+      [Preserve existing goal from previous STATUS.md]
+      
+      ## Immediate Next Actions
+      
+      [Update based on remaining tasks in TASKS.md]
+      
+      ## Links
+      
+      - Task board → `_parallel/projects/$project/TASKS.md`
+      - Detailed log → `_parallel/projects/$project/progress_log.md`
+      - PRD → `_parallel/projects/$project/plan.md`
+  )
+```
+
+## Error Handling
+
+The rule should handle these edge cases:
+
+1. **Missing Directories**: Create memory/tasks/ if it doesn't exist
+2. **Missing TASKS_LOG.md**: Create with header if first archive
+3. **Missing STATUS.md**: Create with default template if doesn't exist
+4. **Duplicate Archives**: Check if task already exists in memory before moving
+5. **TASKS.md Sync Issues**: Warn if task entry not found in checklist
+6. **Metric Calculation**: Handle empty TASKS.md gracefully
+
+## Benefits
+
+This rule provides:
+
+- **Speed**: Automates 6+ manual steps into one triggered action
+- **Consistency**: Ensures all files are properly synchronized
+- **Real-time Status**: STATUS.md automatically reflects current project state
+- **Reliability**: Reduces chance of missed steps or errors
+- **Audit Trail**: Maintains complete history in TASKS_LOG.md
+- **Project Isolation**: Respects project boundaries and structure
+
+## Usage Notes
+
+1. The rule uses file content patterns to detect completion intent
+2. Can be extended with additional trigger patterns as needed
+3. Preserves all task history and metadata
+4. Compatible with existing task-magic workflow
+5. Can be manually triggered by adding completion indicators to task file
+
+## Future Enhancements
+
+Consider adding:
+- Automatic insight extraction based on task content
+- Completion metrics tracking
+- Dependencies resolution for related tasks
+- Notification to other systems or team members
+- Integration with project STATUS.md updates

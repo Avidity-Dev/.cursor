@@ -1,0 +1,62 @@
+# Portable Shell Guidelines – Parsing YAML & Regex Gotchas
+
+These tips prevent common cross-platform errors (BSD vs. GNU tools) when you
+write helper scripts for Task-Magic or any workspace automation.
+
+## 1 Prefer `awk`/shell pattern matching over complex `sed -E`
+
+- BSD `sed` (macOS) differs from GNU `sed` (Linux) – regex like `\(.*?\)` or
+  `?` quantifiers require `-E` and even then semantics differ.
+- If you just need `key: value` extraction, split on `:` with `awk` instead of
+  using capturing groups in `sed`.
+
+```bash
+value=$(awk -F': *' '/^status:/ {print $2; exit}' "$file")
+```
+
+## 2 Parsing YAML front-matter safely
+
+1. YAML header is wrapped by two `---` delimiter lines.
+2. Scan line-by-line; toggle a flag once inside the header and break after the
+   second delimiter.
+
+```bash
+in_yaml=0
+while IFS= read -r line; do
+  [[ $line == '---' ]] && { ((in_yaml++)); [[ $in_yaml -eq 2 ]] && break; continue; }
+  [[ $in_yaml -eq 0 ]] && continue  # not in YAML yet
+  # process key/value pairs here …
+```
+
+## 3 Shell safety boilerplate
+
+```bash
+#!/usr/bin/env bash
+set -euo pipefail  # fail fast, catch unset vars, propagate errors
+```
+
+## 4 Null-separated loops for filenames (handles spaces)
+
+Use `find … -print0 | while IFS= read -r -d '' file; do … done`.
+
+## 5 Quoting & parameter expansion
+
+- Use `${var#prefix}` and `${var%suffix}` for lightweight trimming without sed.
+- Quote every variable unless you explicitly want word-splitting or globbing.
+
+## 6 Produce deterministic output
+
+Pipe to `sort` as the final step so CI diffs are stable regardless of file
+system order.
+
+## 7 Detect missing keys gracefully
+
+Set defaults like `status="UNKNOWN"` then override when the key is found.
+
+## 8 Document the CSV (or JSON) schema in script comments
+
+Helps downstream tools parse correctly.
+
+Following these practices will avoid platform-specific regex errors (e.g.,
+"repetition-operator operand invalid" from BSD `sed`) and make your automation
+portable across developer environments.

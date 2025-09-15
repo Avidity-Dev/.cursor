@@ -1,0 +1,89 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# Entity-Resolution Debugging Lessons 👩🏽‍🚀
+
+> **Scope** – Applies to the Mastermind project's Snowflake/Snowpark based entity-resolution pipeline.  Captures recurring pitfalls, error signatures, and proven fixes surfaced in the chat dated 2025-06-18.
+
+---
+
+## 1 Authentication
+
+| Symptom | Root Cause | Fix |
+|---------|------------|-----|
+| `TypeError: get_session() got an unexpected keyword argument 'auth_override_options'` | Helper wrappers (`get_sso_session`, `get_password_session`) forwarded the wrong kwarg. | Rename to `auth_options` in both the wrapper and call-sites.  See [`src/infrastructure/persistence/connection.py`](mdc:src/infrastructure/persistence/connection.py). |
+| SSO not used even when expected | Default `AuthSettings.method` equals `key_vault`. | Pass `SnowflakeConnector(auth_override_options={'method':'sso'})` in demos/tests. |
+
+### Take-aways
+* **Default auth ≠ SSO** – always override for local dev.
+* Keep wrapper signatures in sync with the master helper.
+
+---
+
+## 2 Logging Noise
+
+| Area | Action |
+|------|--------|
+| Connection creation | Downgraded `logger.info` calls (strategy, role, browser hooks, Reuse…) ➜ `logger.debug`. |
+| Demo script | Switched to concise format: `'%(asctime)s | %(levelname)-8s | %(name)-30s | %(message)s'`. |
+
+### Take-aways
+* Verbose internal details → DEBUG; only user-important events → INFO.
+
+---
+
+## 3 Snowflake / Snowpark Numeric Errors
+
+### 3.1 Empty String ⟶ Numeric
+
+| Error | Signature |
+|-------|-----------|
+| `Numeric value '' is not recognized` | 22018 or 100038 raised during aggregation/join. |
+
+#### Fix Pattern
+```sql
+CASE
+  WHEN col = '' OR col IS NULL THEN 0  -- or NULL
+  ELSE CAST(col AS <NUMERIC_TYPE>)
+END AS col_clean
+```
+Applied to:
+* `addr.LATITUDE__V`, `addr.LONGITUDE__V` → cast to `FLOAT`.
+* `rel.HCO_RELEVANCE` → cast to `DECIMAL(18,5)`.
+* `owner.KEY_NETWORK`, `pats.TOTAL_PATIENTS`, KOL boolean flags.
+
+### 3.2 TRY_CAST Limitation
+
+| Error | Signature | Why |
+|-------|-----------|-----|
+| `Function TRY_CAST cannot be used with arguments of types FLOAT and NUMBER` (22023) | Snowflake forbids TRY_CAST when **source already numeric** and target numeric. |
+
+#### Fix Pattern
+* Drop `TRY_CAST`; wrap with the **CASE** logic above.
+
+### 3.3 Snowpark `na.fill` Type Mismatch
+
+| Warning                               | Cause                         | Fix |
+|---------------------------------------|-------------------------------|-----|
+| `Input value type doesn't match ...`  | Filling `DecimalType` column with `int` | Provide value as `float` (`0.0`) or correct integral size. |
+
+### Fill-Dict Cheat-Sheet
+```python
+hco_df = hco_df.na.fill({
+    "KEY_NETWORK": 0,                 # LongType
+    "DISTINCT_HCP_COUNT": 0,
+    "SPECIALIST_COUNT": 0,
+    "HAS_KOL": 0,
+    "TOTAL_PATIENTS_SUM": 0,
+    "HCO_RELEVANCE": 0.0              # DecimalType(18,5)
+})
+```
+
+---
+
+## 4 Snowflake Browser Hooks & Linter Noise
+
+* `snowflake.connector.auth_webbrowser` is **not present** in current connector versions – type-checker flags as unknown.
+* `DummyModule.open` assignment triggers "attribute unknown" – acceptable; use `# noqa: E501`

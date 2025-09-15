@@ -1,6 +1,6 @@
 ---
-description:
-globs:
+description: This rule specifies the technical details for creating projects in the file-based planning system.
+globs: 
 alwaysApply: false
 ---
 # Project Management Rule
@@ -16,7 +16,7 @@ You are a senior project manager and an expert in structuring development projec
 ## Core Concepts
 
 1. **Project Isolation**: Each project operates independently with its own tasks, plans, and context while sharing global memory for cross-project learning.
-2. **Global Registry**: The `.ai/INDEX.md` file serves as the central discovery mechanism for all projects in the workspace.
+2. **Global Registry**: The `_parallel/INDEX.md` file serves as the central discovery mechanism for all projects in the workspace.
 3. **Standardized Structure**: All projects follow a consistent directory structure and file organization pattern.
 4. **Lifecycle Management**: Projects have clear states (active, completed, archived) with appropriate transitions.
 
@@ -25,7 +25,7 @@ You are a senior project manager and an expert in structuring development projec
 Each project follows this standardized structure:
 
 ```
-.ai/projects/{project-name}/
+_parallel/projects/{project-name}/
   plan.md         # Primary project PRD
   TASKS.md        # Project-specific task checklist
   PROJECT.md      # Project metadata and overview
@@ -44,7 +44,7 @@ Each project follows this standardized structure:
 
 Before creating a project, validate the project name:
 
-1. **Check Existing Projects**: Use `list_dir` on `.ai/projects/` to see existing project directories
+1. **Check Existing Projects**: Use `list_dir` on `_parallel/projects/` to see existing project directories
 2. **Naming Conventions**:
    - Use kebab-case (e.g., `user-authentication`, `data-pipeline-v2`)
    - Be descriptive but concise (2-4 words typically)
@@ -55,7 +55,7 @@ Before creating a project, validate the project name:
 
 Create the project directory structure:
 
-1. **Main Directory**: Create `.ai/projects/{project-name}/`
+1. **Main Directory**: Create `_parallel/projects/{project-name}/`
 2. **Sub-directories**: Create `tasks/` and `context/` subdirectories
 3. **Verification**: Use `list_dir` to confirm structure was created correctly
 
@@ -133,7 +133,7 @@ Use the standard PRD template from `plan.mdc` but populate it with project-speci
 
 ### Step 4: Registry Update
 
-Update the global `.ai/INDEX.md` file:
+Update the global `_parallel/INDEX.md` file:
 
 1. **Read Current Content**: Use `read_file` to get existing INDEX.md content
 2. **Add Project Entry**: Append new project to the registry using this format:
@@ -168,10 +168,10 @@ Update the global `.ai/INDEX.md` file:
 
 #### Completed/Paused → Archived
 - Project is no longer relevant
-- Archive project plan to `.ai/memory/plans/`
-- Archive any remaining tasks to `.ai/memory/tasks/`
+- Archive project plan to `_parallel/memory/plans/`
+- Archive any remaining tasks to `_parallel/memory/tasks/`
 - Update INDEX.md status to "archived"
-- Optionally move entire project directory to `.ai/memory/projects/`
+- Optionally move entire project directory to `_parallel/memory/projects/`
 
 ## Safe File Operations
 
@@ -185,8 +185,8 @@ When creating projects, follow these safety practices:
 ## Project Discovery and Navigation
 
 ### Finding Projects
-- **Primary**: Check `.ai/INDEX.md` for the registry table
-- **Direct**: Use `list_dir` on `.ai/projects/` to see all project directories
+- **Primary**: Check `_parallel/INDEX.md` for the registry table
+- **Direct**: Use `list_dir` on `_parallel/projects/` to see all project directories
 - **Search**: Use `file_search` to find specific project files
 
 ### Project Context Switching
@@ -251,7 +251,7 @@ When working across multiple projects:
 
 1. **Project Context Awareness**: Always identify which project is being worked on
 2. **Structure Consistency**: Ensure all projects follow the standardized structure
-3. **Registry Maintenance**: Keep `.ai/INDEX.md` current with project changes
+3. **Registry Maintenance**: Keep `_parallel/INDEX.md` current with project changes
 4. **Lifecycle Management**: Guide projects through appropriate state transitions
 5. **Integration**: Coordinate project work with Task Magic task and planning systems
 

@@ -1,0 +1,79 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# AI Context Priming System
+
+This rule documents a system for intelligently loading project-specific context into an AI assistant's context window. The goal is to focus the AI's attention on a specific project by automatically discovering and loading relevant files based on that project's documentation and work history.
+
+## Overview
+
+The context priming system is invoked through a dedicated priming command or script. This command should be designed to accept a project name and optional flags to tailor the context that is loaded.
+
+## Suggested Invocation
+
+A user-defined command can be created to execute this workflow. For example:
+
+```
+/prime <project-name> [options]
+```
+
+### Options
+- `--tests` - Include test files (default: excluded)
+- `--no-src` - Exclude source files (default: included)
+
+### Examples
+```
+/prime matching-service-integration
+/prime geocoding-refactor --tests
+/prime entity-resolution-fix --no-src --tests
+```
+
+## How It Works: The Workflow for the AI
+
+When asked to prime context for a project, the AI should perform the following steps:
+
+1.  **Project Documentation Scan**: First, load all high-level documentation from the specified project's directory to understand its goals and history. This includes:
+    *   `_parallel/projects/{project-name}/plan.md`
+    *   `_parallel/projects/{project-name}/progress_log.md`
+    *   `_parallel/projects/{project-name}/STATUS.md`
+    *   `_parallel/projects/{project-name}/TASKS.md`
+    *   All files in `tasks/` and `memory/` subdirectories.
+
+2.  **Intelligent File Discovery**: After reading the project documentation, scan the content of those files for any mentioned file paths (e.g., `src/...`, `tests/...`, `scripts/...`, `notebooks/...`). This creates a dynamic list of relevant files based on the project's own narrative.
+
+3.  **Selective Loading**: Based on the discovered paths and the user's provided flags, load the relevant files into context:
+    *   Source files (`src/*`) should be loaded by default, but skipped if a `--no-src` flag is present.
+    *   Test files (`tests/*`) should only be loaded if a `--tests` flag is present.
+    *   All other referenced files (e.g., scripts, notebooks, other docs) should always be loaded.
+
+4.  **Final Context Structure**: To complete the context, add:
+    *   The root `README.md` for a general project overview.
+    *   Any other `README.md` file in directories related to the project in question.
+    *   Directory listings for `src/` and (if requested) `tests/` to provide a structural map.
+
+## Best Practices for the User
+
+### 1. Document File References
+When working on a project, mention relevant file paths in your progress logs and task descriptions. The AI's priming system will automatically pick these up.
+
+**Example from `progress_log.md`:**
+> Fixed the geocoding issue in `src/application/services/geocoding/geocoder.py`. Updated tests in `tests/unit/services/test_geocoding.py`.
+
+### 2. Use Appropriate Flags
+-   Default (`/prime project-name`): Best for general feature development.
+-   With tests (`--tests`): Use when writing or debugging tests.
+-   Without source (`--no-src --tests`): Ideal for focusing on test-driven development.
+
+### 3. Maintain Project Organization
+Keep project metadata consistently organized under `_parallel/projects/{project-name}/`. This structure is the foundation of the priming system.
+
+## Benefits
+
+1.  **Focused Context**: Only loads files relevant to the current task, avoiding context pollution.
+2.  **Self-Updating**: Automatically discovers new files as you mention them in your work.
+3.  **Flexible**: Supports different development workflows with optional flags.
+4.  **Efficient**: Avoids wasting context space on irrelevant files.
+
+This system works seamlessly with the Task Magic project management system. As you update task files and progress logs, this priming workflow will automatically incorporate the newly referenced files in the next run.

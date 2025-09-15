@@ -21,6 +21,7 @@ alwaysApply: false
 | Trailing `;` after nodes | Drop the semicolon |
 | Parentheses **inside** node text | Escape them or remove them |
 | `%% inline comment` at line end | Put comments on their own line |
+| Mixing node shapes unnecessarily | Use consistent shapes when possible |
 
 ### 2.1 Examples of Common Pitfalls
 
@@ -68,6 +69,24 @@ graph TD
 graph TD
     %% Repo creates GeocodeResult
     N --> H 
+```
+
+**Potentially Confusing (mixed node shapes):**
+
+```mermaid
+graph TD
+    A[API] --> B(Assets)
+    B --> C{Tables}
+    C --> D[Analytics]
+```
+
+**More Consistent:**
+
+```mermaid
+graph TD
+    A[API] --> B[Assets]
+    B --> C[Tables]
+    C --> D[Analytics]
 ```
 
 ---

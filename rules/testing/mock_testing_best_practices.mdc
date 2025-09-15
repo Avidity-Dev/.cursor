@@ -1,0 +1,179 @@
+---
+description: This rule provides guidance for creating effective mock testing.
+globs:
+alwaysApply: false
+---
+
+# Test-Mocking Best Practices
+
+This rule aggregates two common mocking scenarios that frequently cause brittle tests:
+
+1. **Filesystem simulation via `pathlib.Path`**
+2. **Stubbing ML / data-layer calls that return `pandas.DataFrame`**
+
+Follow these patterns to keep unit & integration tests fast, readable, and error-free.
+
+---
+
+## 🗂️ 1. Mocking `pathlib.Path` Safely
+
+Patch _methods_, **not** the class, to avoid breaking internal attributes (e.g., `_flavour`).
+
+### ✅ Patch the needed method
+
+```python
+with patch("pathlib.Path.exists", new=lambda p: str(p) == "/tmp/ok"):
+    ...
+```
+
+### ❌ Don’t patch the whole class
+
+```python
+with patch("pathlib.Path"):  # breaks _flavour internals
+    ...
+```
+
+### ✅ Use `new=` for simple return values
+
+```python
+is_project = lambda p: str(p) in {"/proj", "/proj/dbt_project.yml"}
+with patch("pathlib.Path.exists", new=is_project):
+    ...
+```
+
+### ✅ Force a parent-search miss
+
+```python
+with patch("pathlib.Path.resolve", return_value=Path("/dummy/file.py")):
+    ...
+```
+
+### ✅ Combine with targeted config mocks
+
+```python
+with patch("domain.config.config_loader.config") as cfg:
+    cfg.dbt.project_root = "/proj"
+    # filesystem mocks here …
+```
+
+### 🚫 Avoid brittle iterable `side_effect` lists
+
+Prefer key-based functions/lambdas instead of `[False, True, ...]` lists whose call-count is fragile.
+
+---
+
+## 📊 2. Mocking `pandas.DataFrame` Objects Safely
+
+A stubbed DataFrame must match the **schema** (column names & dtypes) the production code expects; otherwise you’ll hit `KeyError`, `TypeError`, or silent logic bugs.
+
+### ✅ Checklist before returning a mock DataFrame
+
+1. Identify required columns (`df["col"]`, `merge` keys).
+2. Include those columns with representative values (1-3 rows is enough).
+3. Preserve dtypes if arithmetic/comparisons occur (`int`, `float`, `str`).
+4. Add optional columns to trigger branches; omit or set `None` to skip.
+5. Keep row counts small for speed unless aggregation accuracy matters.
+
+### 💡 Example
+
+```python
+with patch.object(service, "_make_predictions", return_value=pd.DataFrame({
+    "key": ["S1"],
+    "VID__V": [1],
+    "prediction": [1],
+    "pred_score": [0.99],
+})):
+    result = service.resolve_entity(search_df)
+```
+
+### 🚫 Anti-Patterns
+
+| Pattern                  | Why it breaks                             |
+| ------------------------ | ----------------------------------------- |
+| `pd.DataFrame()` (empty) | Column lookups raise `KeyError`.          |
+| Missing numeric columns  | Arithmetic on `None` / wrong dtype fails. |
+| Wrong column casing      | Pandas column names are case-sensitive.   |
+| Mismatched indices       | `.loc` operations fail with `KeyError`.   |
+
+### 🎯 DataFrame Index Consistency
+
+When mocking DataFrames that will be used with `.loc`, `.iloc`, or joined operations:
+
+```python
+# ✅ Set explicit indices when needed
+mock_df = pd.DataFrame({'col': [1, 2, 3]})
+mock_df.index = [0, 1, 2]  # Match expected indices
+
+# ❌ Don't assume default RangeIndex
+mock_df = pd.DataFrame({'col': [1, 2, 3]})  # Index is 0, 1, 2
+# Later: df.loc[[5, 10, 15]]  # KeyError!
+```
+
+### 🔗 Multi-DataFrame Consistency
+
+When mocking multiple related DataFrames (e.g., for joins or lookups):
+
+```python
+# ✅ Ensure consistent indices/keys across related DataFrames
+search_df = pd.DataFrame({'id': [1, 2], 'name': ['A', 'B']})
+match_df = pd.DataFrame({'id': [1, 2], 'score': [0.9, 0.8]})
+match_df.index = [0, 1]  # Matches row references
+
+# ❌ Inconsistent references
+neighbors = pd.DataFrame({'match_row': [0, 1, 2]})  # References rows 0, 1, 2
+candidates = pd.DataFrame({'name': ['X']})  # Only has row 0!
+```
+
+### 🧩 Mock at the Right Level
+
+Consider mocking at a higher level when internal methods have complex interactions:
+
+```python
+# ✅ Mock the public interface
+with patch.object(service, 'process_data') as mock:
+    mock.return_value = expected_result
+
+# ❌ Avoid mocking too many internals
+with patch.object(service, '_step1') as m1:
+    with patch.object(service, '_step2') as m2:
+        with patch.object(service, '_step3') as m3:
+            # Brittle and hard to maintain
+```
+
+### 🎯 Import Path Matching
+
+When using `patch()`, ensure the import path matches exactly how the code imports it:
+
+```python
+# If the service imports like this:
+from application.services.model import predict
+
+# ❌ Wrong - path doesn't match the import
+with patch('src.application.services.model.predict'):
+    # Mock won't intercept the call!
+
+# ✅ Correct - matches the import
+with patch('application.services.model.predict'):
+    # Works properly
+
+# ✅ Even better - use patch.object to avoid path issues
+with patch.object(service, 'method_name'):
+    # No import path to worry about
+```
+
+### 📝 Document Mock Expectations
+
+Always document what the mocked data represents:
+
+```python
+# ✅ Clear mock data with comments
+mock_results = pd.DataFrame({
+    'entity_id': ['E1', 'E2'],      # Unique entity identifiers
+    'match_score': [0.95, 0.87],    # Similarity scores (0-1)
+    'match_type': ['exact', 'fuzzy'] # Type of match found
+})
+```
+
+---
+
+**Use these guidelines to keep tests focused on business logic and free from incidental mocking errors.**

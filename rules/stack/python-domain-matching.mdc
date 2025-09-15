@@ -1,0 +1,32 @@
+---
+description: Python domain layer responsibilities for matching logic and business rules
+globs: src/**,tests/**
+---
+
+## Python Domain Matching Rules
+
+- Domain layer owns business rules and decisioning; dbt provides clean, validated data.
+- Keep rules explicit, testable, and parameterized.
+
+### Domain Responsibilities
+
+- Match type determination and confidence scoring
+- Tie-breaking and priority policies
+- Manual override application
+- Dynamic thresholds and rule toggles
+
+### Inputs from dbt
+
+- Cleaned staging/intermediate views (e.g., `matching_candidates`, bounded distance tables)
+- Referential integrity guaranteed by dbt tests
+
+### Patterns
+
+- Value Objects for criteria and results
+- Services orchestrate rule application
+- Repositories read from dbt marts/views; do not duplicate cleansing
+
+### Testing
+
+- Unit-test rules with fixtures independent of Snowflake
+- Integration tests verify end-to-end decisions using dbt-produced datasets

@@ -1,8 +1,7 @@
 ---
-description: 
-globs: 
-alwaysApply: true
+alwaysApply: false
 ---
+
 # Task Magic System Overview
 
 Whenever you use this rule, start your message with the following:
@@ -13,38 +12,39 @@ Whenever you use this rule, start your message with the following:
 
 Task Magic consists of **TWO distinct but complementary parts**:
 
-1. **The Project Management System** (`.ai/` directory) - A tool-agnostic, file-based project management framework for organizing projects, tasks, plans, and memory
+1. **The Project Management System** (`_parallel/` directory) - A tool-agnostic, file-based project management framework for organizing projects, tasks, plans, and memory
 2. **The AI Agent Rules** (`.cursor/rules/task-magic/` directory) - Cursor-specific instructions that teach AI agents how to operate the project management system
 
 ## System Architecture
 
-### The .ai/ Project Management System
+### The \_parallel/ Project Management System
 
 A structured, tool-agnostic directory system for managing multiple projects:
 
 ```
-.ai/
+_parallel/
   projects/
     {project-name}/
       plan.md         # Project PRD
+      progress_log.md # Append-only chronological log
+      STATUS.md       # Live hand-off snapshot (current status)
       tasks/          # Active tasks for this project
         task{id}_name.md
       TASKS.md        # Project task checklist
       context/        # Additional project context
-  memory/             # Global archive (shared across projects)
-    tasks/            # Archived task files from all projects
-    plans/            # Archived plan files from all projects
-    TASKS_LOG.md      # Global task archive log
-    PLANS_LOG.md      # Global plan archive log
+      memory/         # Project-specific memory archive
+        tasks/        # Archived tasks for this project
+        MEMORY.md     # Project memory summary and insights
+        TASKS_LOG.md  # Project-specific task archive log
   INDEX.md            # Global project registry
 ```
 
 ### The .cursor/rules/task-magic/ Rules System
 
-Cursor-specific rules that teach agents how to use the .ai/ system:
+Cursor-specific rules that teach agents how to use the \_parallel/ system:
 
 - `tasks.mdc` - Task creation, management, and lifecycle
-- `plan.mdc` - PRD creation and planning workflows  
+- `plan.mdc` - PRD creation and planning workflows
 - `memory.mdc` - Archival and historical context management
 - `expand.mdc` - Task complexity assessment and sub-task creation
 - `handoff.mdc` - Context transfer between AI sessions
@@ -55,29 +55,41 @@ Cursor-specific rules that teach agents how to use the .ai/ system:
 **NEVER work with Task Magic files without fetching the appropriate rule first!**
 
 - **🚨 MUST FETCH `@tasks.mdc` BEFORE**:
-  - Creating, updating, or modifying any file in `.ai/projects/{project}/tasks/` 
-  - Updating `.ai/projects/{project}/TASKS.md`
+
+  - Creating, updating, or modifying any file in `_parallel/projects/{project}/tasks/`
+  - Updating `_parallel/projects/{project}/TASKS.md`
   - Changing task status, adding timestamps, or working with task IDs
   - **Contains required procedures**: date command for timestamps, YAML format, file naming conventions, dependency checking
 
 - **🚨 MUST FETCH `@plan.mdc` BEFORE**:
-  - Creating or updating any PRD files in `.ai/projects/{project}/plan.md`
+
+  - Creating or updating any PRD files in `_parallel/projects/{project}/plan.md`
   - Working with project plans or feature context documents
 
 - **🚨 MUST FETCH `@memory.mdc` BEFORE**:
-  - Archiving tasks from `.ai/projects/{project}/tasks/` to `.ai/memory/tasks/`
-  - Working with `.ai/memory/TASKS_LOG.md` or `.ai/memory/PLANS_LOG.md`
+
+  - Archiving tasks from `_parallel/projects/{project}/tasks/` to project memory
+  - Working with `_parallel/projects/{project}/memory/TASKS_LOG.md`
+  - Creating or updating `_parallel/projects/{project}/memory/MEMORY.md` files
+  - **Contains required procedures**: single-location archival process, project memory updates, task log management
 
 - **🚨 MUST FETCH `@expand.mdc` BEFORE**:
+
   - Determining if a task should be broken into sub-tasks
   - Creating sub-task structures
 
-- **🚨 MUST FETCH `@handoff.mdc` (or `task-magic/handoff.mdc`) BEFORE**:
-  - Creating or interpreting handoff files in `.ai/handoffs/`
-  - Transferring task context between sessions using the handoff mechanism
+- **🚨 MUST FETCH `@handoff.mdc` BEFORE**:
+
+  - Creating or updating project progress files at `_parallel/projects/{project}/progress_log.md` or status snapshots at `_parallel/projects/{project}/STATUS.md`
+  - Automatically at the end of a work session **or** when significant project state changes
+  - (Still allowed) when the user explicitly requests a "handoff" or "progress update"
+  - When user asks to "update progress" or similar phrasing
+  - Before ending a significant work session on a complex project
+  - When switching focus between different aspects of the same project
+  - **Contains required procedures**: progress file templates, timestamp commands, update workflows
 
 - **🚨 MUST FETCH `@legacy.mdc` WHEN**:
-  - **Detecting legacy structure**: `.ai/tasks/`, `.ai/TASKS.md`, `.ai/plans/PLAN.md`, or `.ai/plans/features/` exist
+  - **Detecting legacy structure**: `_parallel/tasks/`, `_parallel/TASKS.md`, `_parallel/plans/PLAN.md`, or `_parallel/plans/features/` exist
   - **User requests migration**: upgrading from old to new Task Magic system
   - **Mixed structure found**: both legacy and new files present
   - **Purpose**: Provides migration guidance to upgrade to enhanced project-scoped system
@@ -86,51 +98,57 @@ Cursor-specific rules that teach agents how to use the .ai/ system:
 
 **🔍 Automatic Detection Triggers:**
 If you encounter any of these, immediately fetch `@legacy.mdc`:
-- `.ai/tasks/` directory exists (instead of `.ai/projects/{project}/tasks/`)
-- `.ai/TASKS.md` file exists (instead of `.ai/projects/{project}/TASKS.md`)
-- `.ai/plans/PLAN.md` file exists (instead of `.ai/projects/{project}/plan.md`)
-- `.ai/plans/features/` directory exists (instead of `.ai/projects/{project}/context/`)
-- No `.ai/projects/` directory structure present
-- No `.ai/INDEX.md` registry file
+
+- `_parallel/tasks/` directory exists (instead of `_parallel/projects/{project}/tasks/`)
+- `_parallel/TASKS.md` file exists (instead of `_parallel/projects/{project}/TASKS.md`)
+- `_parallel/plans/PLAN.md` file exists (instead of `_parallel/projects/{project}/plan.md`)
+- `_parallel/plans/features/` directory exists (instead of `_parallel/projects/{project}/context/`)
+- No `_parallel/projects/` directory structure present
+- No `_parallel/INDEX.md` registry file
 
 **Agent Response**: When legacy detected, inform user about enhanced system benefits and offer migration using the legacy rule.
 
 ## System Components (Rules Explanation)
 
 1.  **Plans (`@plan.mdc`)**:
-    *   **Purpose**: Defines how Product Requirements Documents (PRDs) are created and structured for projects.
-    *   **Location**: Each project has its own `plan.md` at `.ai/projects/{project}/plan.md`
-    *   **Key Registry**: Global `.ai/INDEX.md` maintains discovery of all project plans
-    *   **Details**: For plan creation, fully review [task-magic/plan.mdc](mdc:.cursor/rules/task-magic/plan.mdc)
+
+    - **Purpose**: Defines how Product Requirements Documents (PRDs) are created and structured for projects.
+    - **Location**: Each project has its own `plan.md` at `_parallel/projects/{project}/plan.md`
+    - **Key Registry**: Global `_parallel/INDEX.md` maintains discovery of all project plans
+    - **Details**: For plan creation, fully review [task-magic/plan.mdc](mdc:.cursor/rules/task-magic/plan.mdc)
 
 2.  **Tasks (`@tasks.mdc`)**:
-    *   **Purpose**: Governs the creation, management, and lifecycle of individual development tasks within projects.
-    *   **Active Tasks**: Each project's active tasks reside in `.ai/projects/{project}/tasks/` as `task{id}_name.md` files.
-    *   **Master View**: Each project has a checklist at `.ai/projects/{project}/TASKS.md` that mirrors the status of tasks in that project's tasks directory.
-    *   **Details**: For task creation, fully review [task-magic/tasks.mdc](mdc:.cursor/rules/task-magic/tasks.mdc)
+
+    - **Purpose**: Governs the creation, management, and lifecycle of individual development tasks within projects.
+    - **Active Tasks**: Each project's active tasks reside in `_parallel/projects/{project}/tasks/` as `task{id}_name.md` files.
+    - **Master View**: Each project has a checklist at `_parallel/projects/{project}/TASKS.md` that mirrors the status of tasks in that project's tasks directory.
+    - **Details**: For task creation, fully review [task-magic/tasks.mdc](mdc:.cursor/rules/task-magic/tasks.mdc)
 
 3.  **Memory (`@memory.mdc`)**:
-    *   **Purpose**: Archives completed and failed tasks and plans to provide historical context across all projects.
-    *   **Location**: Archived files from all projects are stored in the global `.ai/memory/` directory.
-    *   **Log Files**: Chronological logs are maintained in `.ai/memory/TASKS_LOG.md` and `.ai/memory/PLANS_LOG.md`.
-    *   **Details**: For archival workflows, fully review [task-magic/memory.mdc](mdc:.cursor/rules/task-magic/memory.mdc)
 
-4.  **Handoffs (`@handoff.mdc` or `task-magic/handoff.mdc`)**:
-    *   **Purpose**: Facilitates context transfer between AI sessions for specific tasks or projects.
-    *   **Location**: Handoff files are stored in `.ai/handoffs/`.
-    *   **Details**: For creating and using handoff files, review [task-magic/handoff.mdc](mdc:.cursor/rules/task-magic/handoff.mdc)
+    - **Purpose**: Manages a hierarchical memory system with both project-specific and global workspace memory for optimal context management.
+    - **Project Memory**: Each project maintains its own memory archive at `_parallel/projects/{project}/memory/` with local task history and insights.
+    - **Global Memory**: Cross-project learning through global archives at `_parallel/memory/` with workspace-wide knowledge aggregation.
+    - **Dual Archival**: Project tasks are archived to both project memory (primary) and global memory (cross-project learning).
+    - **Details**: For archival workflows and memory management, fully review [task-magic/memory.mdc](mdc:.cursor/rules/task-magic/memory.mdc)
+
+4.  **Progress-Based Handoffs (`@handoff.mdc` or `task-magic/handoff.mdc`)**:
+
+    - **Purpose**: Facilitates context transfer between AI sessions using project-scoped progress tracking.
+    - **Location**: Progress files are stored as `_parallel/projects/{project}/progress_log.md` or status snapshots at `_parallel/projects/{project}/STATUS.md`.
+    - **Details**: For creating and updating progress files, review [task-magic/handoff.mdc](mdc:.cursor/rules/task-magic/handoff.mdc)
 
 5.  **Legacy Migration (`@legacy.mdc`)**:
-    *   **Purpose**: Provides comprehensive guidance for upgrading from legacy single-directory Task Magic to enhanced project-scoped system.
-    *   **Trigger**: Use when detecting legacy structures or user requests migration.
-    *   **Focus**: Migration process, not legacy system usage - helps users upgrade to new system.
-    *   **Details**: For migration workflows, fully review [task-magic/legacy.mdc](mdc:.cursor/rules/task-magic/legacy.mdc)
+    - **Purpose**: Provides comprehensive guidance for upgrading from legacy single-directory Task Magic to enhanced project-scoped system.
+    - **Trigger**: Use when detecting legacy structures or user requests migration.
+    - **Focus**: Migration process, not legacy system usage - helps users upgrade to new system.
+    - **Details**: For migration workflows, fully review [task-magic/legacy.mdc](mdc:.cursor/rules/task-magic/legacy.mdc)
 
 ## Key Distinctions
 
-- **Tool Agnostic**: The `.ai/` directory structure can be used by any AI assistant, human developer, or development tool
+- **Tool Agnostic**: The `_parallel/` directory structure can be used by any AI assistant, human developer, or development tool
 - **Cursor Specific**: The `.cursor/rules/task-magic/` files are specific instructions for Cursor's AI on how to operate the system
-- **Multi-Project**: The enhanced system supports multiple isolated projects with shared memory for cross-project learning
+- **Multi-Project**: The enhanced system supports multiple isolated projects with hierarchical memory (project-specific + global) for optimal context management
 - **Migration Ready**: Legacy detection and upgrade guidance built into the system
 
 This interconnected system allows for structured project development across multiple projects, from high-level planning to task execution and historical review, primarily managed through Markdown files and defined agent responsibilities.

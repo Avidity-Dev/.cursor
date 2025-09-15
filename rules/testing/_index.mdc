@@ -1,0 +1,4 @@
+---
+globs: tests/**/test_*.py
+alwaysApply: false
+---

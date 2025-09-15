@@ -1,0 +1,153 @@
+---
+description: This rule provides guidance for creating effective integration tests.
+globs:
+alwaysApply: false
+---
+
+# Integration Testing Best Practices
+
+This rule provides guidance for creating effective integration tests based on lessons learned from testing complex data transformation functions.
+
+## Core Principles
+
+### 1. Test Behavior, Not Implementation
+
+Integration tests should verify **what** a function does, not **how** it does it.
+
+**✅ Good Example:**
+
+```python
+def test_compare_addresses_returns_correct_structure():
+    result = compare_addresses(hcp_df, hco_df, session, error_handler)
+    assert isinstance(result, DataFrame)
+    assert all(col in result.columns for col in expected_columns)
+```
+
+**❌ Bad Example:**
+
+```python
+def test_compare_addresses_implementation():
+    # Mocking every internal transformation step
+    mock_df.withColumnRenamed.return_value = mock_renamed
+    mock_renamed.select.return_value = mock_selected
+    # ... 20 more lines of mock setup
+```
+
+### 2. Mock at the Boundaries Only
+
+Only mock external dependencies (databases, APIs, file systems), not internal method calls.
+
+**✅ Good:** Mock the Snowflake session
+**❌ Bad:** Mock DataFrame transformation methods
+
+### 3. Keep Tests Simple and Readable
+
+If your test setup is longer than the test itself, you're testing at the wrong level.
+
+**Red Flags:**
+
+- Mock setup > 10 lines
+- Mocks returning mocks returning mocks
+- Need to read implementation to write the test
+- Complex mock behavior configuration
+
+### 4. One Concept Per Test
+
+Each test should verify a single behavior:
+
+- `test_handles_empty_input`
+- `test_returns_required_columns`
+- `test_error_handling`
+
+Not: `test_everything_about_function`
+
+### 5. Integration Test Structure Template
+
+```python
+class TestFunctionIntegration:
+    """Integration tests for [function_name]."""
+
+    def test_basic_happy_path(self):
+        """Test the function works with valid input."""
+        # Arrange: Simple setup
+        input_data = create_simple_test_data()
+
+        # Act: Call the function
+        result = function_under_test(input_data)
+
+        # Assert: Verify behavior
+        assert result is not None
+        assert result.meets_expected_criteria()
+
+    def test_handles_edge_case(self):
+        """Test specific edge case behavior."""
+        # Keep it focused on one edge case
+        pass
+
+    def test_error_handling(self):
+        """Test that errors are handled appropriately."""
+        # Verify the function fails gracefully
+        pass
+```
+
+### 6. When to Use Integration vs Unit Tests
+
+**Integration Tests:**
+
+- Test public APIs/interfaces
+- Verify components work together
+- Test end-to-end workflows
+- Focus on behavior and outcomes
+
+**Unit Tests:**
+
+- Test individual functions/methods
+- Test complex algorithms
+- Test edge cases in isolation
+- Mock all external dependencies
+
+### 7. Practical Example: Testing Data Transformations
+
+For functions like [matching_address.py](mdc:src/domain/services/hco_hcp_matching/matching_address.py):
+
+**Good Integration Test Approach:**
+
+```python
+def test_compare_addresses_integration():
+    # Create minimal mock DataFrames with just the needed structure
+    mock_hcp = MagicMock()
+    mock_hcp.columns = ["VID__V", "ADDRESS_LINE_1__V", "LATITUDE__V", "LONGITUDE__V"]
+
+    # Test the public interface
+    result = compare_addresses(mock_hcp, mock_hco, session, error_handler)
+
+    # Verify the contract, not the implementation
+    assert "DISTANCE" in result.columns
+    assert "EXACT_ADDRESS_FLAG" in result.columns
+```
+
+### 8. Common Pitfalls to Avoid
+
+1. **Over-mocking**: Don't mock things just because you can
+2. **Testing implementation details**: Focus on outcomes, not process
+3. **Brittle tests**: Tests that break when refactoring (without behavior change)
+4. **Unclear failures**: When a test fails, it should be obvious what's broken
+5. **Test complexity**: If you need a debugger to understand the test, it's too complex
+
+### 9. The "Can I Delete the Implementation?" Test
+
+A good integration test should still make sense even if you delete the current implementation and rewrite it from scratch. The test verifies the contract, not the current code.
+
+### 10. Reference Implementation
+
+See [test_compare_addresses_simple.py](mdc:tests/integration/test_compare_addresses_simple.py) for an example of these principles in action.
+
+## Summary
+
+The best integration test is the simplest test that gives confidence the code works correctly. When in doubt, ask:
+
+- "What behavior am I verifying?"
+- "Is this the simplest way to verify it?"
+- "Will this test survive a refactoring?"
+
+Remember: **Simple tests are maintainable tests, and maintainable tests are valuable tests.**
