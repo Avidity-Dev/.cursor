@@ -1,0 +1,24 @@
+{
+  "setup-worktree": [
+    "# Set up Python environment with uv",
+    "uv sync",
+    "",
+    "# Copy environment files from main worktree",
+    "MAIN_WORKTREE=$(git worktree list | grep -v '\\[detached HEAD\\]' | head -1 | awk '{print $1}')",
+    "cp \"$MAIN_WORKTREE/.env\" .env",
+    "cp \"$MAIN_WORKTREE/.dlt/secrets.toml\" .dlt/secrets.toml",
+    "",
+    "# Initialize local development databases (if needed)",
+    "# Uncomment the following lines if you need local DB setup:",
+    "# python -m scripts.get_backups",
+    "# chmod +x scripts/pro-init.sh",
+    "# ./scripts/pro-init.sh",
+    "",
+    "# Verify setup",
+    "python -c 'import dagster; print(f\"Dagster version: {dagster.__version__}\")'",
+    "python -c 'import dbt; print(f\"dbt version: {dbt.__version__}\")'",
+    "",
+    "# Optional: Start Docker containers for local development",
+    "# docker-compose -f docker-compose.dev.yml up -d"
+  ]
+}
