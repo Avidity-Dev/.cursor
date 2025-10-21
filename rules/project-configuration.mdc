@@ -1,0 +1,64 @@
+---
+description: "How configuration is managed across the application, following Clean Architecture principles."
+---
+
+# Project Configuration Guide
+
+This document outlines the authoritative pattern for managing configuration in the `mastermind` project, ensuring strict adherence to Clean Architecture principles.
+
+## 1. Core Principle: Centralized Loading
+
+All configuration loading is an **infrastructure concern** and is centralized in a single, top-level `src/config/` directory. The `domain` layer **must not** contain any logic for reading files or environment variables.
+
+## 2. The Configuration Source of Truth (`src/config/`)
+
+- **`src/config/settings.py`**: (Replaces `src/domain/config/models.py`) Defines the entire application's configuration structure using Pydantic models. This is the single source of truth for the _shape_ of all settings.
+
+- **`src/config/loader.py`**: (Replaces `src/domain/config/config_loader.py`) Contains the logic to load configuration from YAML files and environment variables into the Pydantic models defined in `settings.py`.
+
+- **`src/config/default.yaml`**: (Replaces `src/domain/config/config.yaml`) The base configuration file containing default values.
+
+## 3. How Layers Receive Configuration
+
+Configuration is passed down to layers via **Dependency Injection** from the application's main entry point (e.g., `src/main.py`).
+
+### Domain Layer (`src/domain/`)
+
+The domain layer receives configuration through pure, simple **Value Objects** that contain only the business rules they need. It does not know about the configuration system.
+
+- **Example**: The `OriginalAlgorithm` requires business rules. The entry point creates a `MatchingPolicy` object from the master configuration and injects it. The algorithm knows nothing about `dbt` or file paths.
+
+```python
+# src/domain/value_objects/matching_policy.py
+
+@dataclass
+class MatchingPolicy:
+    assignment_priority: Tuple[str, ...]
+    tie_break_policy: str
+```
+
+### Infrastructure Layer (`src/infrastructure/`)
+
+Infrastructure components also receive their configuration via injection. These configuration objects are simple data containers.
+
+- **Example**: The `DbtOrchestrationService` needs dbt-specific settings. The entry point creates a `DbtConfig` object from the master configuration and injects it. The `DbtConfig` class itself does not load any files or environment variables.
+
+```python
+# src/infrastructure/config/dbt_config.py
+
+@dataclass
+class DbtConfig:
+    project_dir: str
+    profiles_dir: str
+    target: str
+    dbt_vars: Dict[str, Any]
+```
+
+## 4. The Entry Point (`src/main.py`)
+
+The application's entry point is the **only place** that has knowledge of all layers. It is responsible for:
+
+1.  Calling the configuration loader from `src/config/loader.py` to get the master `AppSettings` object.
+2.  Creating layer-specific configuration objects (like `MatchingPolicy` and `DbtConfig`) from the master settings.
+3.  Instantiating all services and repositories.
+4.  Injecting the configuration objects and other dependencies into the components that need them.

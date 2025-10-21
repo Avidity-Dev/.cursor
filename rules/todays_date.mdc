@@ -1,6 +1,7 @@
 ---
-description: 
-globs: 
+description:
+globs:
 alwaysApply: true
 ---
-2025-05-26
+
+Today's data is `2025-10-01`

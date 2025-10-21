@@ -1,0 +1,713 @@
+---
+description: Best practices for writing robust dbt tests that avoid common pitfalls
+globs:
+  - "**/transforms/**"
+alwaysApply: false
+---
+
+# dbt Testing Best Practices
+
+Lessons learned from implementing comprehensive test suites for dbt models.
+
+## Core Testing Principles
+
+### 1. Test at Every Layer
+
+```yaml
+# Staging: Source data quality
+- not_null on primary keys
+- unique on identifiers
+- accepted_values for enums
+- Row count minimums
+
+# Intermediate: Business logic validation
+- Deduplication tests
+- Row count preservation
+- Relationship logic (e.g., "Network overrides OpenData")
+
+# Marts: Final data quality
+- not_null on required fields
+- unique on primary keys
+- relationships to dimension tables
+```
+
+### 2. Document Data Quality Issues, Don't Hide Them
+
+**❌ Bad: Enforcing perfection that doesn't exist**
+
+```yaml
+- name: corporate_name
+  tests:
+    - not_null # Fails with 84 NULL values in production
+```
+
+**✅ Good: Document reality**
+
+```yaml
+- name: corporate_name
+  description: "Corporate name (may be NULL in OpenData source - 84 known cases)"
+  # No not_null test - documented as acceptable data quality issue
+```
+
+**When to allow NULLs:**
+
+- Source data has known quality issues you can't control
+- Business accepts the limitation
+- Downstream models handle NULLs gracefully
+
+**When to enforce not_null:**
+
+- Critical business keys (IDs, foreign keys)
+- Required for downstream logic
+- Data should always exist based on business rules
+
+## Custom Generic Tests (Reusable Test Patterns)
+
+### When to Create Custom Generic Tests
+
+**Use custom generic tests when:**
+
+- ✅ Same validation logic applies to multiple columns/models
+- ✅ You need parameterized behavior (e.g., allow_nulls option)
+- ✅ Validation is domain-specific (e.g., NPI format, postal codes)
+- ✅ You want tests to appear in dbt docs with descriptions
+
+**Use singular tests when:**
+
+- ❌ Complex business logic specific to one model
+- ❌ Cross-model validation (e.g., comparing two tables)
+- ❌ One-off validation that won't be reused
+
+### Creating a Custom Generic Test
+
+**Step 1: Create test file** in `tests/generic/my_test.sql`:
+
+```sql
+{% test my_validation(model, column_name, my_param=default_value) %}
+{#-
+    Documentation explaining:
+    - What this test validates
+    - Parameters and their types
+    - Usage examples
+    - Validation rules
+-#}
+
+select
+    {{ column_name }} as failing_value,
+    'Failure reason description' as failure_reason
+from {{ model }}
+where [condition that returns TRUE for FAILING rows]
+    {% if my_param %}
+    and [additional condition based on parameter]
+    {% endif %}
+
+{% endtest %}
+```
+
+**Step 2: Use in schema.yml**:
+
+```yaml
+columns:
+  - name: my_column
+    tests:
+      - my_validation # Use defaults
+      - my_validation:
+          my_param: custom_value # Override parameter
+          config:
+            severity: warn # Configure severity
+```
+
+**Real Example: NPI Validation**
+
+```sql
+{% test valid_npi(model, column_name, allow_nulls=true) %}
+select
+    {{ column_name }} as invalid_npi,
+    case
+        when {{ column_name }} is null then 'NULL value'
+        when length({{ column_name }}) != 10 then 'Invalid length'
+        when not regexp_like({{ column_name }}, '^[0-9]{10}$') then 'Non-numeric'
+        else 'Unknown failure'
+    end as failure_reason
+from {{ model }}
+where (
+    ({{ column_name }} is not null and trim({{ column_name }}) != '')
+    and (
+        length({{ column_name }}) != 10
+        or not regexp_like({{ column_name }}, '^[0-9]{10}$')
+    )
+    {% if not allow_nulls %}
+    or {{ column_name }} is null
+    {% endif %}
+)
+{% endtest %}
+```
+
+**Usage**:
+
+```yaml
+columns:
+  - name: npi_num
+    tests:
+      - valid_npi # Allows nulls
+      - valid_npi:
+          allow_nulls: false # Enforce not_null
+          config:
+            severity: warn # Data quality issue
+```
+
+**Benefits of Custom Generic Tests:**
+
+1. **DRY Principle**: Define once, use everywhere
+2. **Consistency**: Same logic across all usages
+3. **Maintainability**: Update in one place
+4. **Documentation**: Shows up in dbt docs
+5. **Parameterization**: Flexible per-model configuration
+
+**File Organization:**
+
+```
+tests/
+├── generic/              # Custom generic tests (reusable)
+│   ├── valid_npi.sql
+│   ├── valid_postal_code.sql
+│   └── README.md         # Documentation for custom tests
+├── staging/              # Singular tests (one-off logic)
+│   └── assert_*.sql
+└── ...
+```
+
+## Common Test Patterns
+
+### Pattern 1: Row Count Tests
+
+**❌ WRONG: Aggregate in WHERE clause**
+
+```yaml
+- dbt_utils.expression_is_true:
+    arguments:
+      expression: "count(*) > 10000" # FAILS: Can't use aggregates in WHERE
+```
+
+**✅ RIGHT: Wrap in subquery**
+
+```yaml
+# For models
+- dbt_utils.expression_is_true:
+    arguments:
+      expression: "(SELECT COUNT(*) FROM {{ ref('model_name') }}) > 10000"
+
+# For source tables
+- dbt_utils.expression_is_true:
+    arguments:
+      expression: "(SELECT COUNT(*) FROM {{ source('source_name', 'table_name') }}) > 5000"
+```
+
+**❌ WRONG: Using {{ this }} in model-level tests**
+
+```yaml
+- dbt_utils.expression_is_true:
+    arguments:
+      expression: "(SELECT COUNT(*) FROM {{ this }}) > 10000"
+    # FAILS: {{ this }} resolves to test schema, not model schema
+```
+
+**✅ RIGHT: Use {{ ref() }} for models, {{ source() }} for sources**
+
+```yaml
+- dbt_utils.expression_is_true:
+    arguments:
+      expression: "(SELECT COUNT(*) FROM {{ ref('model_name') }}) > 10000"
+```
+
+### Pattern 2: Deduplication Tests
+
+**Test that UNION/JOIN logic doesn't create duplicates:**
+
+```yaml
+- name: int_hco_unified
+  tests:
+    # No duplicate primary keys
+    - dbt_utils.expression_is_true:
+        arguments:
+          expression: |
+            (SELECT COUNT(*) FROM {{ ref('int_hco_unified') }}) = 
+            (SELECT COUNT(DISTINCT hco_vid) FROM {{ ref('int_hco_unified') }})
+        config:
+          severity: error
+```
+
+### Pattern 3: Business Logic Tests
+
+**Test that business rules are enforced:**
+
+```yaml
+- name: int_hco_unified
+  tests:
+    # Network HCOs should override OpenData HCOs
+    - dbt_utils.expression_is_true:
+        arguments:
+          expression: |
+            (SELECT COUNT(*)
+             FROM {{ ref('int_hco_unified') }} unified
+             JOIN {{ ref('stg_vn_hco') }} network 
+               ON unified.hco_vid = network.hco_vid
+             WHERE unified.in_network = FALSE) = 0
+        config:
+          severity: error
+```
+
+### Pattern 4: Row Count Preservation
+
+**Test that LEFT JOINs don't drop rows:**
+
+```yaml
+- name: int_hco_enriched
+  tests:
+    # Enrichment shouldn't change row count
+    - dbt_utils.expression_is_true:
+        arguments:
+          expression: |
+            (SELECT COUNT(*) FROM {{ ref('int_hco_enriched') }}) = 
+            (SELECT COUNT(*) FROM {{ ref('int_hco_unified') }})
+        config:
+          severity: error
+```
+
+### Pattern 5: Data Quality Thresholds
+
+**Use WARN for quality issues, ERROR for logic issues:**
+
+```yaml
+- name: int_hco_enriched
+  tests:
+    # Network HCOs should have addresses (data quality)
+    - dbt_utils.expression_is_true:
+        arguments:
+          expression: |
+            (SELECT COUNT(*)
+             FROM {{ ref('int_hco_enriched') }}
+             WHERE in_network = TRUE 
+             AND (city IS NULL OR city = '')) < 
+            (SELECT COUNT(*) * 0.1 
+             FROM {{ ref('int_hco_enriched') }} 
+             WHERE in_network = TRUE)
+        config:
+          severity: warn # WARN, not ERROR - data quality issue
+```
+
+## Test Organization
+
+### File Structure
+
+```
+models/
+├── staging/
+│   └── _staging.yml          # All staging model tests (NO intermediate refs!)
+├── intermediate/
+│   └── enriched/
+│       └── _enriched.yml     # Intermediate tests (CAN ref staging)
+├── marts/
+│   └── schema.yml            # Mart tests (CAN ref staging/intermediate)
+└── _sources/
+    ├── edw_ingest_veeva.yml  # Source tests
+    └── edw_adhoc.yml         # Source tests
+
+tests/
+├── generic/                  # Custom generic tests (reusable)
+│   ├── valid_npi.sql
+│   ├── valid_postal_code.sql
+│   └── README.md
+├── staging/                  # Singular tests for staging logic
+│   └── assert_*.sql
+├── intermediate/             # Singular tests for intermediate logic
+│   └── assert_*.sql
+└── marts/                    # Singular tests for mart logic
+    └── assert_*.sql
+```
+
+**Layer Independence Rule:**
+
+- Staging tests must NEVER reference intermediate or mart models
+- Intermediate tests CAN reference staging (via relationships)
+- Mart tests CAN reference any upstream layer
+- This ensures each layer can be tested independently
+
+### Test Naming with Aliases
+
+Use descriptive aliases for complex tests:
+
+```yaml
+- dbt_utils.expression_is_true:
+    arguments:
+      expression: "complex expression here"
+    config:
+      severity: error
+      alias: int_hco_unified_no_duplicate_vids # Descriptive name
+```
+
+## Source Table Tests
+
+**For source tables, use {{ source() }} macro or full table paths:**
+
+```yaml
+sources:
+  - name: edw_ingest_veeva
+    tables:
+      - name: od__hco
+        tests:
+          # Using {{ source() }} macro (preferred)
+          - dbt_utils.expression_is_true:
+              arguments:
+                expression: "(SELECT COUNT(*) FROM {{ source('edw_ingest_veeva', 'od__hco') }}) > 10000"
+              config:
+                severity: error
+
+          # Or using full table path (if needed)
+          - dbt_utils.expression_is_true:
+              arguments:
+                expression: "(SELECT COUNT(*) FROM edw.ingest_veeva.od__hco) > 10000"
+              config:
+                severity: error
+```
+
+## Test Severity Guidelines
+
+### ERROR (Blocks Deployment)
+
+- Primary key violations (not_null, unique)
+- Critical business logic failures
+- Data loss (row count drops significantly)
+- Referential integrity violations
+
+### WARN (Alerts but Doesn't Block)
+
+- Data quality issues (missing addresses)
+- Acceptable NULL values
+- Row count outside expected range but not zero
+- Orphaned relationships (common in hierarchies)
+
+## Testing Strategy by Layer
+
+### Staging Layer
+
+```yaml
+✅ Test:
+  - not_null on primary keys
+  - unique on identifiers
+  - Row count > 0 (data exists)
+  - Source freshness
+
+❌ Don't Test:
+  - Complex business logic
+  - Cross-table relationships
+  - Aggregate metrics
+```
+
+### Intermediate Layer
+
+```yaml
+✅ Test:
+  - Deduplication (count = count distinct)
+  - Row count preservation (LEFT JOIN doesn't drop rows)
+  - Business logic (override rules, filtering logic)
+  - Schema consistency (all columns present after UNION)
+
+❌ Don't Test:
+  - Formatting/presentation
+  - BI-specific requirements
+```
+
+### Marts Layer
+
+```yaml
+✅ Test:
+  - Final data quality (not_null, unique)
+  - Relationships to dimension tables
+  - Row counts match expectations
+  - Boolean flags are valid
+
+❌ Don't Test:
+  - Implementation details from intermediate layer
+```
+
+## Common Pitfalls and Solutions
+
+### Pitfall 1: {{ this }} in Tests
+
+**Problem:** `{{ this }}` in model-level tests resolves to the test schema, causing authorization errors.
+
+**Solution:** Always use `{{ ref('model_name') }}` in expression_is_true tests.
+
+### Pitfall 2: Aggregate Functions in WHERE
+
+**Problem:** Snowflake doesn't allow bare aggregate functions like `COUNT(*)` in expression contexts.
+
+**❌ Wrong:**
+
+```yaml
+- dbt_utils.expression_is_true:
+    arguments:
+      expression: "count(*) > 0" # FAILS: bare aggregate
+```
+
+**✅ Correct:**
+
+```yaml
+# For models
+- dbt_utils.expression_is_true:
+    arguments:
+      expression: "(SELECT COUNT(*) FROM {{ ref('model_name') }}) > 0"
+
+# For source tables
+- dbt_utils.expression_is_true:
+    arguments:
+      expression: "(SELECT COUNT(*) FROM {{ source('source_name', 'table_name') }}) > 0"
+```
+
+**Note:** `dbt_utils.row_count` does NOT exist in dbt_utils 1.3.0. Use `expression_is_true` with SELECT subquery instead.
+
+### Pitfall 3: Testing Transient Data Quality Issues
+
+**Problem:** Tests fail on temporary data quality issues (source delays, processing errors).
+
+**Solution:**
+
+- Use `severity: warn` for data quality
+- Use `severity: error` for logic errors
+- Document known issues in descriptions
+
+### Pitfall 4: Layer Test Independence
+
+**Problem:** `dbt test --select staging` runs tests FROM staging AND tests that REFERENCE staging (from other layers).
+
+**Example:**
+
+```bash
+# This runs ALL of these:
+dbt test --select staging
+
+# Tests OWNED by staging (✅ what you want)
+# + Tests in intermediate that REFERENCE staging (❌ may fail on unbuilt models)
+```
+
+**Solution:** Use path selector for true layer independence:
+
+```bash
+# Test only staging layer (tests defined in staging/_staging.yml)
+dbt test --select "path:models/staging/**"
+
+# Test only intermediate layer
+dbt test --select "path:models/intermediate/**"
+```
+
+### Pitfall 5: {{ column_name }} Template in expression_is_true
+
+**Problem:** Trying to use `{{ column_name }}` as a template variable in `dbt_utils.expression_is_true` column-level tests.
+
+**❌ WRONG: This pattern does NOT work**
+
+```yaml
+- name: npi_num
+  tests:
+    - dbt_utils.expression_is_true:
+        arguments:
+          expression: "{{ column_name }} is null or length({{ column_name }}) = 10"
+        # FAILS: {{ column_name }} is not available in expression_is_true
+```
+
+**Why it fails:**
+
+- `dbt_utils.expression_is_true` doesn't provide a `{{ column_name }}` context variable
+- The macro expects explicit column references, not templates
+- This is a common mistake when trying to write "reusable" column tests
+
+**✅ CORRECT Solutions:**
+
+**Option 1: Use explicit column name in expression_is_true**
+
+```yaml
+- name: npi_num
+  tests:
+    - dbt_utils.expression_is_true:
+        config:
+          where: "npi_num is not null and trim(npi_num) != ''"
+        arguments:
+          expression: "length(npi_num) = 10" # Explicit column name
+```
+
+**Option 2: Create custom generic test (RECOMMENDED for reusability)**
+
+```sql
+-- tests/generic/valid_npi.sql
+{% test valid_npi(model, column_name) %}
+select *
+from {{ model }}
+where {{ column_name }} is not null
+  and length({{ column_name }}) != 10
+{% endtest %}
+```
+
+```yaml
+# Now {{ column_name }} works because it's a test parameter!
+- name: npi_num
+  tests:
+    - valid_npi # Reusable across all NPI columns
+```
+
+**When to use each approach:**
+
+- **Explicit column**: One-off validation, won't be reused
+- **Custom generic test**: Validation applies to multiple columns (DRY principle)
+
+### Pitfall 6: Over-Testing
+
+**Problem:** Testing implementation details that can change safely.
+
+**Solution:** Test business logic and data quality, not implementation details.
+
+**❌ Don't test:**
+
+```yaml
+# Testing that intermediate uses specific CTEs
+- expression: "'network_hcos' in query_text"
+```
+
+**✅ Do test:**
+
+```yaml
+# Testing that business rule is enforced
+- expression: "network records override opendata records"
+```
+
+## Complete Example
+
+```yaml
+models:
+  - name: int_hco_unified
+    description: |
+      Unified HCO dataset combining Network and OpenData sources.
+
+      Expected Row Counts (as of 2025-10-02):
+      - Baseline: ~48,000 HCOs
+      - Network: ~5,000 rows
+      - OpenData (after dedup): ~43,000 rows
+
+    columns:
+      - name: hco_vid
+        description: Primary unique identifier
+        tests:
+          - unique
+          - not_null
+
+      - name: corporate_name
+        description: Corporate name (may be NULL in OpenData - 84 known cases)
+        # No not_null test - documented as acceptable
+
+      - name: in_network
+        description: Source flag (TRUE=Network, FALSE=OpenData)
+        tests:
+          - not_null
+          - accepted_values:
+              values: [true, false]
+
+    tests:
+      # Row count minimum
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "(SELECT COUNT(*) FROM {{ ref('int_hco_unified') }}) > 45000"
+          config:
+            severity: error
+            alias: int_hco_unified_minimum_row_count
+
+      # No duplicates
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: |
+              (SELECT COUNT(*) FROM {{ ref('int_hco_unified') }}) = 
+              (SELECT COUNT(DISTINCT hco_vid) FROM {{ ref('int_hco_unified') }})
+          config:
+            severity: error
+            alias: int_hco_unified_no_duplicates
+
+      # Business rule: Network overrides OpenData
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: |
+              (SELECT COUNT(*)
+               FROM {{ ref('int_hco_unified') }} unified
+               JOIN {{ ref('stg_vn_hco') }} network 
+                 ON unified.hco_vid = network.hco_vid
+               WHERE unified.in_network = FALSE) = 0
+          config:
+            severity: error
+            alias: int_hco_unified_network_override
+```
+
+## Quick Reference Card
+
+| Test Type       | Syntax                                                 | Severity | When to Use                                 |
+| --------------- | ------------------------------------------------------ | -------- | ------------------------------------------- |
+| Not Null        | `- not_null`                                           | ERROR    | Primary keys, foreign keys, required fields |
+| Unique          | `- unique`                                             | ERROR    | Identifiers, primary keys                   |
+| Accepted Values | `- accepted_values:`                                   | ERROR    | Enums, boolean flags                        |
+| Relationships   | `- relationships:`                                     | WARN     | Foreign keys (allow orphans in hierarchies) |
+| Row Count Min   | `expression: "(SELECT COUNT(*) FROM {{ ref() }}) > N"` | ERROR    | Ensure data exists                          |
+| Deduplication   | `expression: "COUNT(*) = COUNT(DISTINCT pk)"`          | ERROR    | Validate UNION/JOIN logic                   |
+| Data Quality    | `expression: "incomplete_records < threshold"`         | WARN     | Monitor data quality                        |
+
+## Testing Checklist
+
+Before merging dbt changes:
+
+- [ ] All staging models have primary key tests (unique, not_null)
+- [ ] Intermediate models test business logic (deduplication, precedence)
+- [ ] Marts test final data quality and relationships
+- [ ] Test aliases are descriptive
+- [ ] Severity levels are appropriate (ERROR vs WARN)
+- [ ] Known data quality issues are documented in descriptions
+- [ ] Expression tests use `{{ ref() }}` not `{{ this }}`
+- [ ] Aggregate functions wrapped in SELECT subqueries
+- [ ] Row count tests have baseline documented
+- [ ] **Staging tests don't reference intermediate/mart models** (layer independence)
+- [ ] Relationship tests in intermediate layer (not staging)
+- [ ] Test independently: `dbt test --select "path:models/staging/**"`
+
+## Common Test Selection Commands
+
+```bash
+# Test specific layer independently (recommended)
+dbt test --select "path:models/staging/**"       # Only staging tests
+dbt test --select "path:models/intermediate/**"  # Only intermediate tests
+dbt test --select "path:models/marts/**"         # Only mart tests
+
+# Test specific model and its tests
+dbt test --select "stg_hcp"                     # Includes tests that reference it
+dbt test --select "stg_hcp,test_type:generic"  # Only generic tests on model
+
+# Test specific custom generic tests
+dbt test --select "test_name:valid_npi"         # All NPI validation tests
+dbt test --select "test_name:valid_postal_code" # All postal code tests
+
+# Exclude intermediate dependencies (useful for staging)
+dbt test --select "staging" --exclude "test_name:*int_*"
+
+# Run all tests (full suite)
+dbt test
+
+# Run tests and build models together
+dbt build --select "staging+"  # Build staging and downstream, test everything
+```
+
+---
+
+**Last Updated:** 2025-10-17  
+**Related Rules:** dbt_layer_responsibilities.mdc  
+**Key Learnings:**
+
+- `dbt_utils.row_count` doesn't exist - use `expression_is_true` with SELECT subquery
+- Use path selectors for true layer independence
+- Staging must never reference intermediate models
+- **`{{ column_name }}` doesn't work in `expression_is_true`** - create custom generic test instead
+- Custom generic tests in `tests/generic/` are the DRY way to handle repeated validation logic
+- See `transforms/tests/generic/README.md` for custom generic test examples

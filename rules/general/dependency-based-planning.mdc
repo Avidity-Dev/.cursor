@@ -1,0 +1,124 @@
+---
+description: Use dependency-based milestones instead of rigid calendar timelines
+globs: ["**/plans/**/*.md", "**/specs/**/*.md", "**/PROJECT.md", "**/PLAN.md", "**/docs/plans/**/*.md"]
+alwaysApply: false
+---
+
+# Dependency-Based Planning
+
+## Core Principle
+
+**Focus on logical dependencies over calendar dates.** Real projects slip, dependencies shift, and rigid timelines become fiction. Express what depends on what, not when it happens.
+
+## Anti-Pattern: Rigid Timeline Planning
+
+❌ **Avoid:**
+```markdown
+## Timeline
+- Week 1: Set up database connections
+- Week 2: Build staging models
+- Week 3: Validate staging models
+- Week 4: Create marts
+- Week 5: Testing and documentation
+```
+
+## Pattern: Dependency-Based Milestones
+
+✅ **Prefer:**
+```markdown
+## Implementation Phases
+
+### Phase 1: Foundation
+**Completion Criteria:** Database connections established and tested
+
+### Phase 2: Staging Layer
+**Dependencies:** Phase 1 complete
+**Completion Criteria:** All staging models built and row counts validated
+**Can parallelize:** Individual staging models can be built independently
+
+### Phase 3: Data Marts
+**Dependencies:** Core staging models from Phase 2
+**Completion Criteria:** Business logic implemented, joins validated
+**Validation Gate:** Data quality checks pass before proceeding
+
+### Phase 4: Testing & Documentation
+**Dependencies:** Phase 3 complete
+**Can parallelize:** Documentation can start during Phase 3
+```
+
+## Key Elements
+
+### 1. Dependencies, Not Dates
+- State what must complete before starting
+- Identify blockers and prerequisites
+- Use phrases like "After X completes" not "In Week 2"
+
+### 2. Parallel Work Streams
+- Explicitly identify what can be done simultaneously
+- Note independent work that can progress without blocking
+
+### 3. Validation Gates
+- Define clear completion criteria for each phase
+- Include quality gates between major phases
+- Specify what must be validated before proceeding
+
+### 4. Flexible Ordering
+- Allow for reordering based on discoveries
+- Accommodate priority shifts
+- Enable fast-tracking when dependencies clear early
+
+## Example Transformations
+
+### Before: Calendar-Driven
+```markdown
+- Monday: Design schema
+- Tuesday-Wednesday: Implement models
+- Thursday: Test models
+- Friday: Deploy to production
+```
+
+### After: Dependency-Driven
+```markdown
+1. **Schema Design**
+   - Completion: ERD approved, constraints defined
+
+2. **Model Implementation**
+   - Depends on: Schema design complete
+   - Completion: All models pass dbt compile
+
+3. **Model Testing**
+   - Depends on: Models implemented
+   - Can parallel: Unit tests while implementing
+   - Completion: All tests green, data quality validated
+
+4. **Production Deployment**
+   - Depends on: Testing complete, stakeholder approval
+   - Validation gate: Pre-prod smoke tests pass
+```
+
+## Benefits
+
+1. **Realistic Planning:** Reflects how work actually flows
+2. **Flexible Execution:** Adapts to changing conditions
+3. **Clear Dependencies:** Makes blockers visible
+4. **Parallel Efficiency:** Identifies opportunities for concurrent work
+5. **Risk Management:** Validation gates prevent cascade failures
+
+## When to Apply
+
+Use dependency-based planning for:
+- Multi-phase projects
+- Cross-team collaborations
+- Projects with uncertain timelines
+- Work with external dependencies
+- Iterative/agile development
+
+## Red Flags in Plans
+
+Watch for these signs of overly rigid planning:
+- Specific dates without justification
+- Week-by-week breakdowns beyond 2 weeks
+- No mention of dependencies
+- No parallel work identified
+- Missing validation criteria
+- Calendar-based rather than completion-based phases

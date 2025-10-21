@@ -1,0 +1,233 @@
+---
+description: "API documentation for the matching service, including classes, methods, and data objects."
+globs:
+  - "src/**/matching/**.py"
+  - "tests/**/matching/**.py"
+---
+
+# Matching Service API Documentation
+
+This document provides a comprehensive overview of the Matching Service API, detailing its classes, methods, and data objects, along with their respective source files.
+
+## 1. Overview
+
+The matching service is designed using a Clean Architecture approach, separating concerns into distinct layers: Application, Domain, and Infrastructure.
+
+- **Application Layer**: Orchestrates the matching process, coordinates data retrieval, and invokes the domain logic.
+- **Domain Layer**: Contains the core business logic, including matching algorithms and business rules, with no dependencies on external frameworks.
+- **Infrastructure Layer**: Implements data access and other external concerns, such as querying pre-processed dbt models.
+
+## 2. Application Layer
+
+This layer contains the primary entry points and orchestration logic for the matching service.
+
+### 2.1. `MatchingService`
+
+The main service for orchestrating the HCP-HCO matching process, particularly for the dbt-driven workflow.
+
+- **File**: `src/application/use_cases/matching/matching_service.py`
+
+#### Class Definition
+
+```python
+class MatchingService:
+    def __init__(
+        self,
+        session: Session,
+        query_service: MatchingQueryService,
+        dbt_orchestrator: DbtOrchestrationService,
+        hcp_repository: Optional[HCPRepositoryInterface] = None,
+        hco_repository: Optional[HCORepositoryInterface] = None,
+    ):
+        # ...
+
+    def run_matching_with_mode_selection(self, use_dbt: Optional[bool] = None) -> list:
+        # ...
+
+    def run_dbt_matching_process(self) -> list:
+        # ...
+```
+
+#### Methods
+
+- `__init__(self, session, query_service, dbt_orchestrator, hcp_repository=None, hco_repository=None)`: Initializes the service with dependencies.
+- `run_matching_with_mode_selection(self, use_dbt=None)`: Runs the matching process, automatically selecting the mode (dbt vs. legacy) based on configuration.
+- `run_dbt_matching_process(self)`: The main entry point for the dbt-driven matching workflow. It prepares dbt models, fetches data, executes the domain algorithm, and persists the results.
+
+### 2.2. `RunMatching`
+
+A use case class that orchestrates the matching process by coordinating a query service and a matching algorithm.
+
+- **File**: `src/application/use_cases/matching/run_matching.py`
+
+#### Class Definition
+
+```python
+class RunMatching:
+    def __init__(
+        self,
+        query_service: MatchingQueryService,
+        algorithm: MatchingAlgorithm,
+        logger=None,
+    ):
+        # ...
+
+    def execute(self, filters: Optional[MatchingFilters] = None) -> List[MatchResult]:
+        # ...
+
+    def get_matching_data_summary(self, filters: Optional[MatchingFilters] = None) -> Dict:
+        # ...
+```
+
+#### Methods
+
+- `__init__(self, query_service, algorithm, logger=None)`: Initializes the use case with a query service and a matching algorithm.
+- `execute(self, filters=None)`: Executes the matching process by fetching data using the query service and applying the matching algorithm.
+- `get_matching_data_summary(self, filters=None)`: Retrieves a summary of the available matching data without running the full matching algorithm.
+
+### 2.3. `MatchingQueryService` (Protocol)
+
+An application-level protocol defining the contract for reading shaped matching data.
+
+- **File**: `src/application/use_cases/matching/matching_query_service.py`
+
+#### Protocol Definition
+
+```python
+class MatchingQueryService(Protocol):
+    def get_address_comparisons(self, filters: MatchingFilters) -> Iterable[AddressComparisonResult]:
+        # ...
+
+    def get_match_criteria(self) -> Iterable[MatchCriteriaResult]:
+        # ...
+
+    def get_owner_mappings(self) -> Iterable[OwnerMappingResult]:
+        # ...
+```
+
+#### Methods
+
+- `get_address_comparisons(self, filters)`: Retrieves address comparison data.
+- `get_match_criteria(self)`: Retrieves match criteria data.
+- `get_owner_mappings(self)`: Retrieves HCO owner mapping data.
+
+## 3. Domain Layer
+
+This layer defines the core business logic and interfaces.
+
+### 3.1. `MatchingAlgorithm` (Protocol)
+
+A domain-level protocol that defines the interface for all matching algorithm implementations.
+
+- **File**: `src/domain/services/matching/algorithms/matching_algorithm.py`
+
+#### Protocol Definition
+
+```python
+class MatchingAlgorithm(Protocol):
+    def compute_from_results(
+        self,
+        address_comparisons: List,
+        match_criteria: List,
+        owner_mappings: List,
+        filters: Optional[Dict] = None,
+    ) -> List[Match]:
+        # ...
+
+    def get_algorithm_metadata(self) -> dict:
+        # ...
+```
+
+#### Methods
+
+- `compute_from_results(self, address_comparisons, match_criteria, owner_mappings, filters=None)`: Computes matches using pre-processed data from a query service.
+- `get_algorithm_metadata(self)`: Returns metadata about the algorithm implementation.
+
+### 3.2. Repository Interfaces
+
+These protocols define the contracts for data access, which are implemented in the infrastructure layer.
+
+- **File**: `src/domain/contracts/matching/matching_interfaces.py`
+
+#### Interfaces
+
+- `HCORepositoryInterface`: For accessing Healthcare Organization (HCO) data.
+- `HCPRepositoryInterface`: For accessing Healthcare Provider (HCP) data.
+- `AffiliationRepositoryInterface`: For accessing affiliation data.
+- `AddressRepositoryInterface`: For accessing address data.
+- `OverrideRepositoryInterface`: For accessing override data.
+
+## 4. Infrastructure Layer
+
+This layer provides concrete implementations of the interfaces defined in the domain and application layers.
+
+### 4.1. `DbtMatchingQueryService`
+
+An implementation of the `MatchingQueryService` that reads data from pre-computed dbt models.
+
+- **File**: `src/infrastructure/query_services/dbt_matching_query_service.py`
+
+#### Class Definition
+
+```python
+class DbtMatchingQueryService:
+    def __init__(self, session: Session, schema: Optional[str] = None):
+        # ...
+
+    def get_address_comparisons(self, filters: MatchingFilters) -> Iterable[AddressComparisonResult]:
+        # ...
+
+    def get_match_criteria(self) -> Iterable[MatchCriteriaResult]:
+        # ...
+
+    def get_owner_mappings(self) -> Iterable[OwnerMappingResult]:
+        # ...
+```
+
+## 5. Data Transfer Objects (DTOs)
+
+These are simple data container objects used to transfer data between layers.
+
+- **File**: `src/application/use_cases/matching/matching_query_service.py`
+
+### 5.1. `MatchingFilters`
+
+Used to specify filters for matching queries.
+
+```python
+class MatchingFilters:
+    def __init__(
+        self,
+        distance_threshold: Optional[float] = None,
+        limit: Optional[int] = None,
+        hcp_vids: Optional[list[str]] = None,
+    ):
+        # ...
+```
+
+### 5.2. `AddressComparisonResult`
+
+DTO for address comparison query results.
+
+```python
+class AddressComparisonResult:
+    # Attributes: hcp_vid, hco_vid, distance_km, exact_address_1, is_nearby, key_network
+```
+
+### 5.3. `MatchCriteriaResult`
+
+DTO for match criteria query results from the aggregated dbt model.
+
+```python
+class MatchCriteriaResult:
+    # Attributes: hcp_vid, total_candidates, close_address_count, etc.
+```
+
+### 5.4. `OwnerMappingResult`
+
+DTO for HCO owner mapping query results.
+
+```python
+class OwnerMappingResult:
+    # Attributes: hco_vid, hco_ancestor_vid, last_path_affil, key_network, etc.
+```

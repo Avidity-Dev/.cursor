@@ -1,0 +1,56 @@
+---
+alwaysApply: true
+---
+
+# Software Engineering Standard
+
+A single, cohesive standard that links core principles to concrete practices and enforceable quality gates. Use it to design, review, and evolve code consistently across the codebase.
+
+## Principles (what we optimize for)
+
+- **Correctness first** — shipping working software is prioritized over elegance; refactor after it works.
+- **Simplicity (KISS)** — prefer the simplest approach that solves the problem today.
+- **DRY** — centralize knowledge; one source of truth for every piece of logic.
+- **YAGNI** — build only what is needed now; defer speculative abstractions.
+- **Separation of concerns** — layered architecture (Presentation, Application, Domain, Infrastructure) with clear boundaries.
+- **Readability and testability** — code is written for humans and must be easy to test.
+- **Iterative delivery** — small, verifiable increments; avoid big-bang changes.
+
+## Architecture and Design (how we shape code)
+
+- **OOP with composition-first** — each capability lives in a dedicated class; prefer composition over inheritance.
+- **Single responsibility at every level** — file/class/function does one thing; split when concerns diverge.
+- **Modular design** — components are interchangeable, isolated, and testable; use dependency injection or protocols to reduce coupling.
+- **Naming for intent** — names must reveal purpose; avoid vague terms like "data", "info", or "helper".
+- **Layer roles (backend)** — `Application`: `UseCase`/`QueryService` orchestrates flow; `Domain`: `Manager`/`Policy` owns business rules; `Infrastructure`: `Repository`/`Gateway` handles IO. Do not mix layers or leak infrastructure into domain.
+- **Scalability mindset** — design for extension (e.g., interfaces, protocol conformance) without premature generalization.
+- **Anti-patterns to avoid** — no “God” classes; break monoliths into cohesive units across UI, State, Handlers, and Networking.
+
+## Structure and Sizing (how we package code)
+
+- **Files** — target ≤500 lines; begin splitting when approaching 400. Organize with folders and clear naming.
+- **Classes** — aim ≤200 lines; split into helpers when exceeding this or when responsibilities blur.
+- **Functions** — aim 30–40 lines; break apart when they grow beyond a single responsibility.
+
+## Quality Gates (what reviewers enforce)
+
+- The feature works and is covered by automated tests at appropriate levels.
+- Separation of concerns is respected (layer boundaries intact; dependencies point inward).
+- Names are intention-revealing; no vague or placeholder identifiers.
+- File/class/function sizes are within thresholds or a follow-up refactor is scheduled.
+- Components are modular with low coupling and explicit interfaces.
+- No dead code or speculative abstractions (YAGNI).
+- Readability: clear structure, straightforward control flow, comments explain the “why.”
+
+## Refactoring Triggers (when to change it)
+
+- File approaches 400 lines, class >200, function >40, or control flow becomes deeply nested.
+- Multiple responsibilities emerge in a unit; unclear names; tight coupling; copy-paste logic appears.
+- Pain signals: hard-to-test code, frequent merge conflicts in the same file, or unclear ownership of logic.
+
+## Exceptions and Practice Notes
+
+- Thresholds are guardrails, not dogma. Exceed temporarily only to land a fix or spike, and create a follow-up task to refactor.
+- Prefer incremental refactors tied to behavior-preserving tests over large rewrites.
+- When deviating from this standard, document the rationale in the PR description.
+- 2025-05-26

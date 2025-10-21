@@ -11,16 +11,16 @@ globs: transforms/**
 
 ### Responsibilities dbt SHOULD own
 
-- Schema validation: not_null, unique, accepted_values, relationships.
-- Data cleansing/standardization: trimming, casing, regex normalization.
-- Referential integrity checks between staging models.
-- Precompute heavy but stable metrics (e.g., coarse distance bounds) with incremental models.
-- Static filters that rarely change may be parameterized via vars (e.g., active status).
+- **Schema validation**: not_null, unique, accepted_values, relationships.
+- **Data cleansing/standardization**: trimming, casing, regex normalization.
+- **Referential integrity checks** between staging models.
+- **Precompute heavy but stable metrics** (e.g., coarse distance bounds) with incremental models.
+- **Static filters** that are stable and environment-configurable (e.g., active status).
 
 ### Responsibilities dbt SHOULD NOT own
 
-- Dynamic business rules, confidence scoring, tie-breaking.
-- Manual override decisioning.
+- **Dynamic business rules**, confidence scoring, tie-breaking.
+- **Manual override decisioning**.
 
 ### Naming & Columns
 

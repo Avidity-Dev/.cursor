@@ -1,0 +1,236 @@
+---
+alwaysApply: true
+description: Protocol for creating perfectly aligned ASCII diagrams and charts
+---
+
+# ASCII Diagram Precision Protocol
+
+When creating ASCII diagrams with box borders, flowcharts, or any aligned ASCII art, follow this systematic protocol to ensure **perfect alignment every time**.
+
+## The Problem
+
+ASCII diagrams fail when:
+
+- Mental estimation replaces precise counting
+- No width template is established before drawing
+- Unicode characters (→, ↓, ←, ↑) cause visual confusion
+- No verification step catches misalignment
+
+## The Solution: 6-Step Protocol
+
+### 1. DEFINE WIDTH FIRST ⚠️ MANDATORY
+
+Before drawing a single character:
+
+```
+Decision: "This box will be exactly 60 characters wide (content between pipes)"
+```
+
+State the width explicitly in a comment during construction (can be removed after).
+
+### 2. USE RULER TEMPLATE DURING CONSTRUCTION
+
+Create a ruler comment to guide alignment:
+
+```
+<!-- 0----+----1----+----2----+----3----+----4----+----5----+----6 -->
+┌─────────────────────────────────────────────────────────────┐
+│ Content goes here                                            │
+└─────────────────────────────────────────────────────────────┘
+```
+
+The ruler helps verify each line is exactly the target width.
+
+### 3. PAD SYSTEMATICALLY (NOT BY EYE)
+
+For each content line inside the box:
+
+**Step A**: Write the content first
+
+```
+│ int_hcp_unified → int_hcp_enriched → int_hcp_extension
+```
+
+**Step B**: Count characters explicitly
+
+- Count each visible character as 1 (including Unicode: →, ↓, ←, ↑)
+- Count each space as 1
+- Do NOT estimate—count systematically left to right
+
+**Step C**: Calculate spaces needed
+
+```
+spaces_needed = box_width - content_length
+```
+
+**Step D**: Add exact number of trailing spaces
+
+```
+│ int_hcp_unified → int_hcp_enriched → int_hcp_extension      │
+  ↑ 55 chars content ↑                                ↑ 6 spaces ↑
+```
+
+### 4. BORDER VERIFICATION
+
+All border lines must be identical length:
+
+```
+┌─────────────────────────────────────────────────────────────┐  ← Top border
+├─────────────────────────────────────────────────────────────┤  ← Middle divider
+└─────────────────────────────────────────────────────────────┘  ← Bottom border
+```
+
+Count dashes in first border, then copy-paste for subsequent borders.
+
+### 5. PROGRAMMATIC VERIFICATION (STRONGLY RECOMMENDED)
+
+When possible, use a script to verify alignment instead of trusting visual inspection:
+
+**Python verification script**:
+
+```python
+import sys
+expected_width = 61  # Set to your box content width
+
+for i, line in enumerate(sys.stdin, start=1):
+    line = line.rstrip('\n')
+    if '│' in line and '┌' not in line and '├' not in line and '└' not in line:
+        start = line.find('│')
+        end = line.rfind('│')
+        content = line[start+1:end]
+        if len(content) != expected_width:
+            print(f'❌ Line {i}: {len(content)} chars (expected {expected_width})')
+        else:
+            print(f'✓ Line {i}: {len(content)} chars')
+```
+
+**Usage**:
+
+```bash
+cat file.md | python3 verify.py
+```
+
+This catches off-by-one errors that visual inspection misses.
+
+### 6. FINAL VERIFICATION CHECKLIST
+
+Before considering the diagram complete:
+
+- [ ] All border lines are identical length (copy-paste verified)
+- [ ] All content lines have exactly `box_width` characters between pipes
+- [ ] **Programmatic verification passed** (if available)
+- [ ] Right-side pipes form a perfect vertical line (visually scan)
+- [ ] Test in monospace font viewer (copy to text editor)
+- [ ] No "eyeballed" spacing—every line mathematically verified
+
+## Character Counting Rules
+
+1. **Unicode characters count as 1**: `→` = 1, `↓` = 1, `←` = 1, `↑` = 1
+2. **Spaces count as 1 each**: Don't skip them in your count
+3. **Don't trust visual estimation**: Some fonts make characters look wider/narrower
+4. **Use systematic counting**: Touch each character as you count, don't guess
+
+## Common Box Drawing Characters
+
+```
+Corners:  ┌ ┐ └ ┘
+Borders:  ─ │
+Junctions: ├ ┤ ┬ ┴ ┼
+```
+
+## Example: Proper Construction Process
+
+**Step 1**: Define width
+
+```
+// Building a 60-character-wide box
+```
+
+**Step 2**: Create borders (count dashes)
+
+```
+┌────────────────────────────────────────────────────────────┐
+│                                                            │
+└────────────────────────────────────────────────────────────┘
+```
+
+**Step 3**: Add content with precise padding
+
+```
+Content: " HCP Pipeline" = 13 characters
+Padding needed: 60 - 13 = 47 spaces
+
+│ HCP Pipeline                                               │
+  ^13 chars^   ^47 spaces^                                  ^
+```
+
+**Step 4**: Copy-paste borders to ensure identical length
+
+```
+┌────────────────────────────────────────────────────────────┐  ← 60 dashes
+├────────────────────────────────────────────────────────────┤  ← copy-paste
+└────────────────────────────────────────────────────────────┘  ← copy-paste
+```
+
+**Step 5**: Programmatically verify (or manually count)
+
+```bash
+# Pipe diagram section through verification script
+cat diagram.md | python3 -c "
+for line in __import__('sys').stdin:
+    if '│' in line and '┌' not in line:
+        content = line[line.find('│')+1:line.rfind('│')]
+        print(f'{len(content)} chars: {\"✓\" if len(content)==60 else \"❌\"}')"
+```
+
+**Step 6**: Final visual check
+
+```
+Top border: 60 dashes ✓
+Content 1: 60 chars ✓
+Content 2: 60 chars ✓
+Bottom border: 60 dashes ✓
+Right pipes aligned: ✓
+```
+
+## Anti-Patterns to Avoid
+
+❌ **Don't do this**:
+
+- "That looks about right" (visual estimation)
+- Adding spaces until it "feels aligned"
+- Skipping the ruler template
+- Drawing borders different lengths
+
+✅ **Do this**:
+
+- Count every character systematically
+- Calculate exact padding: `width - content_length`
+- Use ruler template during construction
+- Copy-paste borders to ensure identical length
+- Verify mathematically before finalizing
+
+## When to Use This Protocol
+
+Apply this protocol for:
+
+- Box diagrams with borders (`┌─┐│└┘`)
+- Flowcharts with aligned boxes
+- Tables with column alignment
+- Any ASCII art requiring precise alignment
+- Data flow diagrams
+- Architecture diagrams
+
+## Success Criteria
+
+You have succeeded when:
+
+1. Every right-side pipe forms a perfect vertical line
+2. Every content line is exactly the declared width
+3. All borders are identical length
+4. The diagram looks perfect in any monospace font
+5. You can explain the exact character count for any line
+
+---
+
+**Remember**: Perfect ASCII diagrams are not about artistic skill—they're about **mathematical precision**. Count, calculate, verify. Every time.

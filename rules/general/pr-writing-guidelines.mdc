@@ -1,0 +1,166 @@
+---
+description: Guidelines for writing effective pull request descriptions
+alwaysApply: false
+---
+
+# Pull Request Writing Guidelines
+
+## Tone and Style
+
+**Be technical and neutral, not promotional.**
+
+❌ Avoid:
+
+- Marketing language ("awesome", "powerful", "revolutionary")
+- Excessive checkmarks and congratulatory tone
+- Reading like a presentation to stakeholders
+- "Impact" sections that feel like sales pitches
+
+✅ Do:
+
+- Describe what changed factually
+- Explain why changes were made (rationale)
+- Use neutral, technical language
+- Write for other engineers, not executives
+
+## Structure
+
+### Title
+
+- Be specific and descriptive
+- Focus on what changed, not themes
+- Example: "dbt Model Refactoring - Enriched/Extension Layer Separation" not "DBT 3-Layer Architecture Transformation"
+
+### Overview
+
+Brief paragraph stating what the PR does. Focus on the actual changes, not architectural philosophy.
+
+### Changes Section
+
+Organize by what actually changed:
+
+- Group related changes together
+- Use subsections for different areas
+- Describe the change, then briefly explain why if non-obvious
+- Don't force everything under a single theme if changes follow different patterns
+
+### Rationale Section (optional)
+
+Explain design decisions when they're not obvious:
+
+- Why this pattern was chosen
+- Why different approaches were used in different areas
+- Performance or maintainability considerations
+
+Keep it technical and concise.
+
+### Breaking Changes Section
+
+Always include this, even if it's just "None."
+
+## Content Guidelines
+
+### Avoid Over-Theming
+
+Don't force all changes under a single branded concept. If different parts of the system follow different patterns, acknowledge that.
+
+❌ "Complete 3-layer architecture transformation"
+✅ "HCP/HCO models use enriched/extension separation; affiliations use candidate/scored/resolved pattern"
+
+### Be Specific About Patterns
+
+Instead of abstract descriptions, show the actual flow:
+
+❌ "Implements clean layer separation"
+✅ "`stg_hcp*` → `int_hcp_unified` → `int_hcp_enriched` → `int_hcp_extension` → `hcp` (mart)"
+
+### Explain Why Different, Not Why Awesome
+
+Focus on the reasoning, not the benefits:
+
+❌ "✅ Easier to extend! ✅ Better separation! ✅ More maintainable!"
+✅ "The enriched layer contains stable features that rarely change. The extension layer contains business logic that may need per-environment customization."
+
+### Document What, Not How Great
+
+List what was added/changed/removed without editorializing:
+
+❌ "Added comprehensive, industry-leading documentation (1000+ lines!)"
+✅ "Added column documentation to intermediate schemas (361+ lines added)"
+
+## Length
+
+PR descriptions should be:
+
+- Long enough to explain what changed and why
+- Short enough that reviewers will actually read them
+- Free of redundancy and marketing speak
+
+If you find yourself adding checkmarks and exclamation points, you've probably gone too far.
+
+## Examples
+
+### Good PR Description Structure
+
+**Note:** PR description files should start with `## Overview`, not a title. The title is passed separately to `gh pr create --title`.
+
+```markdown
+## Overview
+
+Adds JWT-based authentication for API endpoints. Users must authenticate
+to access protected resources.
+
+## Changes
+
+### Authentication Flow
+
+- Added `AuthService` for token generation and validation
+- Protected routes now check for valid JWT in Authorization header
+- Token expires after 24 hours
+
+### User Model
+
+- Added `password_hash` field to User model
+- Added `last_login` timestamp
+
+### Testing
+
+- Added auth integration tests
+- Added token validation unit tests
+
+## Rationale
+
+JWT chosen over session-based auth because:
+
+- Stateless (scales horizontally)
+- Works with mobile clients
+- Standard approach for REST APIs
+
+## Breaking Changes
+
+All API endpoints except `/login` and `/register` now require authentication.
+Existing clients must add Authorization header.
+```
+
+### Poor PR Description Example
+
+```markdown
+## Overview
+
+This PR brings CUTTING-EDGE security to our application with an
+INDUSTRY-LEADING authentication system!
+
+## Impact
+
+✅ **Amazing Security**: World-class JWT implementation!
+✅ **Incredible Scalability**: Handles MILLIONS of users!
+✅ **Best Practices**: Following ALL the latest patterns!
+✅ **Developer Experience**: So easy to use!
+
+[... continues in this vein ...]
+```
+
+## Summary
+
+Write PRs like you're explaining changes to a colleague over coffee, not
+pitching a product to investors. Be clear, be technical, be factual.

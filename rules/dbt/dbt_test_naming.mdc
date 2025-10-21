@@ -1,0 +1,151 @@
+---
+description: Guidelines for naming dbt tests with aliases for readable test output
+globs: transforms/**/*.yml, transforms/**/*.yaml
+---
+
+## dbt Test Naming Rules
+
+### The Problem
+
+Without aliases, `dbt_utils.expression_is_true` tests generate unreadable 200+ character names:
+
+```
+dbt_utils_expression_is_true_mdm_hco_enriched__SELECT_COUNT_FROM_ref_mdm_hco_enriched_WHERE_in_network_TRUE...
+```
+
+### The Rule
+
+**ALWAYS provide an `alias` config for `dbt_utils.expression_is_true` tests.**
+
+### Required Pattern
+
+```yaml
+- dbt_utils.expression_is_true:
+    config:
+      alias: descriptive_test_name # REQUIRED
+      severity: error # or warn
+    arguments:
+      expression: "SQL expression here"
+```
+
+## Naming Patterns
+
+### 1. Source Minimum Row Counts
+
+```yaml
+alias: source_{schema}_{table}_minimum_row_count
+# Example: source_veeva_opendata_hco_minimum_row_count
+```
+
+### 2. Model Minimum Row Counts
+
+```yaml
+alias: {schema}_{model}_minimum_row_count
+# Example: edw_adhoc_hco_relevant_minimum_row_count
+```
+
+### 3. Data Availability Checks
+
+```yaml
+alias: {source_or_model}_has_{data_type}
+# Example: source_veeva_opendata_address_has_primary_addresses
+# Example: hcp_has_network_providers
+```
+
+### 4. Data Quality Assertions
+
+```yaml
+alias: {model}_no_duplicate_{field}s
+# Example: mdm_hco_unified_no_duplicate_vids
+
+alias: {model}_{subset}_{assertion}
+# Example: mdm_hco_enriched_network_hcos_have_addresses
+```
+
+### 5. Business Logic Validation
+
+```yaml
+alias: {model}_{business_rule_description}
+# Example: mdm_hco_unified_network_overrides_opendata
+# Example: dim_dates_within_valid_range
+```
+
+## Severity Guidelines
+
+- **error**: Critical data quality (must not fail in production)
+  - Primary sources must have data
+  - No duplicate primary keys
+  - Referential integrity violations
+- **warn**: Informational data quality (monitor but don't block)
+  - Secondary sources row counts
+  - Data availability for optional fields
+  - KOL designation presence
+
+## Quick Reference
+
+| Test Type     | Pattern                            | Example                      |
+| ------------- | ---------------------------------- | ---------------------------- |
+| Minimum rows  | `{source/model}_minimum_row_count` | `stg_hcp_minimum_row_count`  |
+| Data exists   | `{model}_has_{data}`               | `hcp_has_kol_designations`   |
+| No duplicates | `{model}_no_duplicate_{field}s`    | `mdm_hco_no_duplicate_vids`  |
+| Business rule | `{model}_{rule}`                   | `network_overrides_opendata` |
+
+## What NOT to Do
+
+❌ **No alias at all**
+
+```yaml
+- dbt_utils.expression_is_true:
+    arguments:
+      expression: "..."
+```
+
+❌ **Alias after arguments**
+
+```yaml
+- dbt_utils.expression_is_true:
+    arguments:
+      expression: "..."
+    config:
+      alias: test_name # Wrong order
+```
+
+## Column-Level Tests
+
+Column-level `dbt_utils.expression_is_true` tests **do not need aliases** - they automatically include the column name:
+
+```yaml
+columns:
+  - name: latitude
+    tests:
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "{{ column_name }} between -90 and 90"
+          # No alias needed - becomes: latitude_between_-90_and_90
+```
+
+## Complete Example
+
+```yaml
+models:
+  - name: stg_od_hcp
+    description: Staging model for HCPs
+    tests:
+      - dbt_utils.expression_is_true:
+          config:
+            alias: stg_od_hcp_minimum_row_count
+            severity: error
+          arguments:
+            expression: "(SELECT COUNT(*) FROM {{ ref('stg_od_hcp') }}) > 500"
+
+      - dbt_utils.expression_is_true:
+          config:
+            alias: stg_od_hcp_has_network_providers
+            severity: warn
+          arguments:
+            expression: "(SELECT COUNT(*) FROM {{ ref('stg_od_hcp') }} WHERE in_network = TRUE) > 0"
+```
+
+## Reference
+
+See `docs/dbt-test-naming-conventions.md` for comprehensive guidelines with more examples and anti-patterns.

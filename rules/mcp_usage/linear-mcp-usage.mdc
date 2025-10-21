@@ -1,0 +1,161 @@
+---
+description: Guidelines for using Linear MCP tools effectively, including known issues and workarounds
+alwaysApply: false
+---
+
+# Linear MCP Usage Guidelines
+
+## Core Principles
+
+When working with Linear MCP tools, always prioritize **specificity and user intent** over broad data retrieval.
+
+## Project Queries
+
+### Default Behavior for "My Projects"
+
+When a user asks for "my projects" or similar personal queries, **ALWAYS** use the `member: "me"` parameter:
+
+```javascript
+// ✅ CORRECT - Shows only user's projects
+mcp_Linear_list_projects({
+  member: "me",
+});
+
+// ❌ WRONG - Shows all projects in workspace
+mcp_Linear_list_projects({});
+```
+
+### When to Use Unfiltered Queries
+
+Only retrieve all projects when explicitly requested:
+
+- "Show me all projects in the workspace"
+- "List every project"
+- "What projects exist in Linear?"
+
+## Parameter Usage Best Practices
+
+### Always Use Specific Filters When Available
+
+- **Personal queries**: Use `member: "me"`
+- **Team queries**: Use `team: "Team Name"`
+- **Status filtering**: Use `state: "In Progress"` when relevant
+- **Search queries**: Use `query: "search term"` for name-based filtering
+
+### Pagination Strategy
+
+- Start with reasonable limits (10-50) for initial queries
+- Use `limit` parameter to control response size
+- Check `pageInfo.hasNextPage` for additional results
+- Use `after`/`before` cursors for pagination
+
+### Date Filtering
+
+- Use ISO-8601 format: `"2025-01-01"`
+- Use duration format for relative dates: `"-P1W"` (last week)
+- Apply date filters when user asks about recent activity
+
+## Common Query Patterns
+
+### User's Active Projects
+
+```javascript
+mcp_Linear_list_projects({
+  member: "me",
+  state: "In Progress",
+  orderBy: "updatedAt",
+});
+```
+
+### Recent Projects
+
+```javascript
+mcp_Linear_list_projects({
+  member: "me",
+  updatedAt: "-P1M", // Last month
+  orderBy: "updatedAt",
+});
+```
+
+### Search User's Projects
+
+```javascript
+mcp_Linear_list_projects({
+  member: "me",
+  query: "data pipeline",
+});
+```
+
+## Error Prevention
+
+### Always Ask for Clarification When Ambiguous
+
+- "All projects" vs "My projects"
+- "Recent projects" vs "All recent projects"
+- "Projects by team" vs "All projects"
+
+### Default to Most Likely Interpretation
+
+- "My projects" = `member: "me"`
+- "Recent projects" = `member: "me"` + `updatedAt: "-P1W"`
+- "Active projects" = `member: "me"` + `state: "In Progress"`
+
+## Response Formatting
+
+### Project Summaries Should Include
+
+- Project name and status
+- Lead person
+- Key dates (start/target)
+- Brief description
+- Relevant labels
+
+### Group by Status
+
+- In Progress
+- Planning
+- Backlog
+- Completed
+- Archived
+
+### Provide Actionable Next Steps
+
+- "Would you like me to get more details about a specific project?"
+- "Should I filter by a particular status or team?"
+- "Would you like to see the next page of results?"
+
+## Tool-Specific Guidelines
+
+### list_projects
+
+- Default to `member: "me"` for personal queries
+- Use appropriate `limit` values (10-50 for initial queries)
+- Always check pagination info
+
+### get_project
+
+- Use when user wants details about a specific project
+- Requires project ID or name
+
+### list_issues
+
+- Use `assignee: "me"` for personal issue queries
+- Combine with other filters as needed
+
+### create_issue
+
+- Always specify required fields: `title`, `team`
+- Use descriptive titles and descriptions
+- Set appropriate priority and labels
+
+## Anti-Patterns to Avoid
+
+❌ **Don't retrieve all data when user asks for personal data**
+❌ **Don't ignore pagination when dealing with large result sets**
+❌ **Don't assume user wants all projects when they say "my projects"**
+❌ **Don't use broad queries when specific filters are available**
+
+✅ **Do use specific parameters to match user intent**
+✅ **Do ask for clarification when requests are ambiguous**
+✅ **Do provide organized, actionable summaries**
+✅ **Do offer next steps and additional filtering options**

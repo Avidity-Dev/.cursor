@@ -1,0 +1,640 @@
+---
+description: Guidelines for using Notion MCP tools effectively, including known issues and workarounds
+alwaysApply: false
+---
+
+# Notion MCP Tool Usage Guidelines
+
+This rule provides guidance for effectively using Notion MCP tools, based on real-world experience and troubleshooting.
+
+## Tool Overview
+
+The Notion MCP provides several tools for working with Notion workspaces:
+
+- `mcp_Notion_notion-search` - Search across workspace and connected sources
+- `mcp_Notion_notion-fetch` - Retrieve page/database details
+- `mcp_Notion_notion-create-pages` - Create new pages
+- `mcp_Notion_notion-update-page` - Update existing pages
+- `mcp_Notion_notion-move-pages` - Move pages between parents
+- `mcp_Notion_notion-duplicate-page` - Duplicate existing pages
+- `mcp_Notion_notion-create-database` - Create new databases
+- `mcp_Notion_notion-update-database` - Update database schemas
+- `mcp_Notion_notion-create-comment` - Add comments to pages
+- `mcp_Notion_notion-get-comments` - Get comments from pages
+- `mcp_Notion_notion-get-teams` - List teams/teamspaces
+- `mcp_Notion_notion-get-users` - List users
+- `mcp_Notion_notion-get-self` - Get your bot user info
+- `mcp_Notion_notion-get-user` - Get specific user details
+
+## Using the MCP Tools - API Patterns
+
+### Tool: `mcp_Notion_notion-search`
+
+**Purpose:** Search across your Notion workspace
+
+**Parameters:**
+
+- `query` (required): Search terms
+- `query_type` (optional): `"internal"` for workspace-only, or omit for broader search
+
+**Example:**
+
+```json
+{
+  "query": "Plans database",
+  "query_type": "internal"
+}
+```
+
+**Returns:** List of matching pages/databases with URLs, titles, and highlights
+
+### Tool: `mcp_Notion_notion-fetch`
+
+**Purpose:** Get detailed information about a page or database
+
+**Parameters:**
+
+- `id` (required): Page or database ID (from URL or search results)
+
+**Example:**
+
+```json
+{
+  "id": "2099d786-9087-804e-8040-efb5a6229015"
+}
+```
+
+**Returns:**
+
+- For databases: Complete schema with property definitions, data source info
+- For pages: Content, properties, parent relationships
+
+**Use case:** Always fetch database details before creating pages to understand the schema
+
+### Tool: `mcp_Notion_notion-create-pages`
+
+**Purpose:** Create new Notion pages
+
+#### ✅ Working Approach: Create Without Parent
+
+```json
+{
+  "pages": [
+    {
+      "properties": {
+        "Name": "Page Title",
+        "Document Type": "PRD"
+      },
+      "content": "# Markdown content here..."
+    }
+  ]
+}
+```
+
+**Key Points:**
+
+- Omit the `parent` parameter entirely
+- This creates a standalone page that can be moved manually later
+- Works reliably for basic page creation
+- Can create multiple pages in one call (array of page objects)
+
+**Returns:** Array of created pages with `id`, `url`, and `properties`
+
+#### Multiple Pages Example
+
+```json
+{
+  "pages": [
+    {
+      "properties": { "Name": "Page 1" },
+      "content": "Content for page 1"
+    },
+    {
+      "properties": { "Name": "Page 2" },
+      "content": "Content for page 2"
+    }
+  ]
+}
+```
+
+#### ❌ Known Issues with Parent Parameter
+
+**Problem:** The `parent` parameter validation is extremely strict and often fails with:
+
+```
+Parameter 'parent' must be one of types [object, object, object], got string
+```
+
+**Attempted Solutions That Failed:**
+
+1. Using `data_source_id` format: `{'data_source_id': 'xxx', 'type': 'data_source_id'}`
+2. Using `database_id` format: `{'database_id': 'xxx', 'type': 'database_id'}`
+3. Using `page_id` format: `{'page_id': 'xxx', 'type': 'page_id'}`
+4. Various object structure variations
+
+**Root Cause:** The tool validation seems to have strict requirements for parent object structure that aren't clearly documented. The MCP layer may be serializing objects incorrectly.
+
+### Tool: `mcp_Notion_notion-update-page`
+
+**Purpose:** Update existing page properties or content
+
+**Status:** ⚠️ Has parameter validation issues similar to create-pages
+
+**Expected Parameters:**
+
+- `data` (required): Object with page updates
+
+**Known Issues:**
+
+- Parameter validation errors: `Expected object, received string`
+- Difficult to get correct parameter format
+- May need workaround approaches
+
+### Tool: `mcp_Notion_notion-move-pages`
+
+**Purpose:** Move pages to a new parent (page or database)
+
+**Status:** ❌ Currently not working due to parent parameter issues
+
+**Expected Parameters:**
+
+- `page_or_database_ids` (required): Array of IDs to move
+- `new_parent` (required): Parent object (has same validation issues)
+
+**Known Issue:**
+
+```
+Parameter 'new_parent' must be one of types [object, object, object, object], got string
+```
+
+### Tool: `mcp_Notion_notion-duplicate-page`
+
+**Purpose:** Duplicate an existing page
+
+**Parameters:** (Not yet tested)
+
+- Likely requires page ID
+- May have similar parent parameter issues
+
+### Tool: `mcp_Notion_notion-update-database`
+
+**Purpose:** Modify database schema (add/remove properties, update options)
+
+**Use cases:**
+
+- Add new properties to database
+- Modify select options
+- Update property descriptions
+- Change database settings
+
+**Important:** Cannot modify:
+
+- Title properties (only one allowed, cannot delete)
+- Synced databases (read-only)
+- Unique ID properties (only one allowed)
+
+**Property Type Examples:**
+
+```json
+// Add text property
+"New Text Field": {
+  "type": "rich_text",
+  "rich_text": {}
+}
+
+// Add select property
+"Priority": {
+  "type": "select",
+  "select": {
+    "options": [
+      {"name": "High", "color": "red"},
+      {"name": "Medium", "color": "yellow"},
+      {"name": "Low", "color": "green"}
+    ]
+  }
+}
+
+// Add date property
+"Due Date": {
+  "type": "date",
+  "date": {}
+}
+
+// Add people property
+"Assignee": {
+  "type": "people",
+  "people": {}
+}
+```
+
+### Tool: `mcp_Notion_notion-create-comment` / `notion-get-comments`
+
+**Purpose:** Add or retrieve comments on pages
+
+**Parameters:**
+
+- `mcp_Notion_notion-create-comment`: `page_id`, `body` (markdown text)
+- `mcp_Notion_notion-get-comments`: `page_id`
+
+**Use case:** Add review comments, feedback, or discussions to pages
+
+### Tool: `mcp_Notion_notion-get-users` / `notion-get-teams`
+
+**Purpose:** List users and teams in workspace
+
+**Use case:** Get user IDs for assigning pages, setting permissions, or mentions
+
+### Recommended MCP Workflow
+
+1. **Search** for target database: `mcp_Notion_notion-search`
+2. **Fetch** database schema: `mcp_Notion_notion-fetch`
+3. **Create** page without parent: `mcp_Notion_notion-create-pages`
+4. **Manual step**: Move page to database in Notion UI
+5. **Manual step**: Set properties to match database schema
+
+**Why manual steps?** Parent parameter validation issues prevent programmatic database assignment.
+
+## Database Integration Workarounds
+
+### Current Limitation
+
+- Cannot directly create pages in databases due to parent parameter issues
+- Cannot move pages between databases programmatically
+- Cannot update page properties to match database schemas
+
+### Recommended Workflow
+
+1. **Create standalone page** (this works reliably)
+2. **Manually move to target database** in Notion UI
+3. **Manually set properties** to match database schema
+
+## Property Mapping Guidelines
+
+### For Database Pages
+
+When creating pages that will be moved to databases:
+
+- Use exact property names from database schema
+- Match select option values exactly (case-sensitive)
+- Use `null` for optional fields
+- Let auto-increment fields handle themselves
+
+### Common Property Types
+
+```json
+{
+  "Name": "Page Title", // title field
+  "Document Type": "PRD", // select field (exact match)
+  "Lead": null, // person field
+  "Completed": "__YES__", // checkbox field
+  "date:Due Date:start": "2024-12-25", // date field
+  "date:Due Date:is_datetime": 0 // date field (0=date, 1=datetime)
+}
+```
+
+## Content Format Guidelines
+
+### Notion-Flavored Markdown
+
+Notion uses a variant of standard Markdown with additional features. **Key principles:**
+
+- Use **tabs for indentation** (not spaces)
+- Use backslashes to escape characters (e.g., `\*` renders as `*`)
+- Block types use `{color="Color"}` attribute to set block color
+
+### Basic Rich Text Formatting
+
+```markdown
+**Bold text**
+_Italic text_
+~~Strikethrough~~
+<span underline="true">Underlined text</span>
+`Inline code`
+[Link text](URL)
+[^URL] # Citations
+<span color="blue">Colored text</span>
+$Equation$ # Inline math (needs whitespace before/after $)
+<br> # Inline line break within a block
+```
+
+### Headings
+
+```markdown
+# Heading 1 {color="blue"}
+
+## Heading 2 {color="green"}
+
+### Heading 3 {color="red"}
+```
+
+Note: Headings 4, 5, and 6 are not supported and convert to heading 3.
+
+### Lists
+
+```markdown
+- Bulleted item {color="gray"}
+  Children
+
+1. Numbered item {color="blue"}
+   Children
+
+- [ ] Todo item {color="yellow"}
+      Children
+- [x] Completed todo {color="green"}
+      Children
+```
+
+**Important:** List items should contain inline rich text, otherwise they render as empty items.
+
+### Mentions
+
+```markdown
+# User
+
+<mention-user url="{{URL}}">User name</mention-user>
+
+# Or self-closing: <mention-user url="{{URL}}"/>
+
+# Page
+
+<mention-page url="{{URL}}">Page title</mention-page>
+
+# Database
+
+<mention-database url="{{URL}}">Database name</mention-database>
+
+# Data Source
+
+<mention-data-source url="{{URL}}">Data source name</mention-data-source>
+
+# Date/Datetime
+
+<mention-date start="YYYY-MM-DD" end="YYYY-MM-DD"/>
+<mention-date start="YYYY-MM-DDThh:mm:ssZ" end="YYYY-MM-DDThh:mm:ssZ"/>
+```
+
+**Note:** URLs must always be provided and refer to existing entities. Names/titles are optional.
+
+### Colors
+
+**Text colors** (colored text, transparent background):
+`gray`, `brown`, `orange`, `yellow`, `green`, `blue`, `purple`, `pink`, `red`
+
+**Background colors** (colored background, contrasting text):
+`gray_bg`, `brown_bg`, `orange_bg`, `yellow_bg`, `green_bg`, `blue_bg`, `purple_bg`, `pink_bg`, `red_bg`
+
+**Usage:**
+
+- Block colors: `{color="blue"}` on first line
+- Inline colors: `<span color="blue_bg">text</span>`
+
+### Advanced Block Types
+
+#### Quotes
+
+```markdown
+> Single line quote {color="blue"}
+
+    Children
+
+> Multi-line quote<br>Line 2<br>Line 3 {color="green"}
+```
+
+**Important:** Use `<br>` for line breaks within quotes, not multiple `>` lines.
+
+#### Toggles
+
+```markdown
+▶ Toggle content {color="gray"}
+Children (must be indented)
+
+▶# Toggle heading 1 {color="blue"}
+Children
+
+▶## Toggle heading 2 {color="green"}
+Children
+
+▶### Toggle heading 3 {color="red"}
+Children
+```
+
+**Critical:** Children must be indented to be toggleable.
+
+#### Callouts
+
+```xml
+<callout icon="💡" color="blue_bg">Rich text content</callout>
+```
+
+**Important:** Use `<br>` for line breaks, not newlines. Use Markdown for formatting inside callouts (e.g., `**bold**`, not `<strong>`).
+
+#### Tables
+
+```xml
+<table fit-page-width="true" header-row="true" header-column="false">
+	<colgroup>
+		<col color="gray" width="200">
+		<col color="blue">
+	</colgroup>
+	<tr color="gray_bg">
+		<td>Header 1</td>
+		<td color="blue">Header 2</td>
+	</tr>
+	<tr>
+		<td>Data cell with **bold**</td>
+		<td>Another cell</td>
+	</tr>
+</table>
+```
+
+**Color precedence:** Cell > Row > Column
+
+**Formatting:** Use Markdown inside cells (e.g., `**bold**`), not HTML.
+
+#### Columns
+
+```xml
+<columns>
+	<column>
+		Content in column 1
+	</column>
+	<column>
+		Content in column 2
+	</column>
+</columns>
+```
+
+#### Code Blocks
+
+````markdown
+```python
+def hello():
+    print("Hello, World!")
+```
+````
+
+#### Equations
+
+```markdown
+$$
+E = mc^2
+$$
+```
+
+#### Media Blocks
+
+```xml
+<image source="{{URL}}" color="gray">Caption text</image>
+<video source="{{URL}}" color="blue">Caption text</video>
+<audio source="{{URL}}" color="green">Caption text</audio>
+<pdf source="{{URL}}" color="red">Caption text</pdf>
+<file source="{{URL}}" color="yellow">Caption text</file>
+```
+
+**Note:** Use compressed URLs like `{{1}}` or full URLs like `example.com`. Don't use `{{https://example.com}}`.
+
+#### Sub-pages and Databases
+
+```xml
+# Create new sub-page
+<page>New Page Title</page>
+
+# Move existing page (WARNING: moves the page!)
+<page url="{{URL}}" color="blue">Page Title</page>
+
+# Create new database
+<database inline="true" icon="📊">New Database</database>
+
+# Create linked database view
+<database data-source-url="{{URL}}" inline="false">Linked View</database>
+
+# Move existing database (WARNING: moves the database!)
+<database url="{{URL}}" inline="true">Database Name</database>
+```
+
+**Critical warnings:**
+
+- `<page url="...">` will **MOVE** the page - use `<mention-page>` to just reference
+- `<database url="...">` will **MOVE** the database - use `<mention-database>` to just reference
+
+#### Synced Blocks
+
+```xml
+# Original synced block (omit url when creating new)
+<synced_block>
+	Content that can be synced
+</synced_block>
+
+# Reference to existing synced block
+<synced_block_reference url="{{URL}}">
+	Children (updates both original and reference)
+</synced_block_reference>
+```
+
+#### Other Blocks
+
+```xml
+---  # Divider
+
+<table_of_contents color="gray"/>  # Auto-generated TOC
+
+:emoji_name:  # Custom emoji
+```
+
+### Formatting Best Practices
+
+1. **Use tabs for indentation** - Critical for toggles, lists, columns
+2. **Escape special characters** - Use `\` before markdown delimiters you want literal
+3. **Line breaks in special blocks** - Use `<br>` in callouts and quotes
+4. **Mentions require URLs** - Always provide URL, name/title is optional
+5. **Be careful with page/database blocks** - They move content, not just reference
+6. **Use Markdown in XML blocks** - Inside tables, callouts, use `**bold**` not `<strong>`
+7. **Color precedence matters** - Cell > Row > Column in tables
+
+## Search and Discovery
+
+### Finding Databases
+
+Use `mcp_Notion_notion-search` with:
+
+- `query_type: "internal"` for workspace search
+- Look for database pages in results
+- Use `mcp_Notion_notion-fetch` to get database schema
+
+### Database Schema Analysis
+
+When working with databases:
+
+1. Fetch database details to understand schema
+2. Note property names and types
+3. Check for required vs optional fields
+4. Understand select option values
+
+## Error Handling
+
+### Common Error Patterns
+
+1. **Parent parameter validation errors** - Omit parent parameter
+2. **Property validation errors** - Check exact property names and values
+3. **Content format errors** - Ensure proper markdown structure
+
+### Debugging Approach
+
+1. Start with minimal examples
+2. Test without parent parameter first
+3. Add complexity gradually
+4. Use manual Notion UI for final steps when needed
+
+## Best Practices
+
+### For Page Creation
+
+1. **Always omit parent parameter** initially
+2. **Use exact property names** from database schema
+3. **Test with simple content** first
+4. **Plan for manual final steps** in Notion UI
+
+### For Database Integration
+
+1. **Create standalone pages** programmatically
+2. **Move to databases** manually in Notion UI
+3. **Set properties** manually to match schema
+4. **Document the manual steps** for team reference
+
+## Future Improvements Needed
+
+### Tool Limitations to Address
+
+1. **Parent parameter validation** - Needs clearer documentation or fix
+2. **Database page creation** - Should work directly without workarounds
+3. **Property updates** - Should work reliably for database pages
+4. **Move operations** - Should work between databases
+
+### Recommended Enhancements
+
+1. Better error messages for parent parameter issues
+2. Clear examples of working parent parameter formats
+3. Direct database page creation without parent parameter workarounds
+4. Reliable property update functionality
+
+## Example Workflow
+
+```python
+# 1. Create standalone page (this works)
+create_page_result = mcp_Notion_notion_create_pages({
+    "pages": [{
+        "properties": {"Name": "My Document"},
+        "content": "# Content here..."
+    }]
+})
+
+# 2. Get page ID from result
+page_id = create_page_result["pages"][0]["id"]
+
+# 3. Manual steps in Notion UI:
+#    - Move page to target database
+#    - Set properties to match database schema
+#    - Verify all fields are populated correctly
+```
+
+This approach provides reliable page creation while working around the current tool limitations.

@@ -1,0 +1,187 @@
+---
+globs: "**/transforms/**"
+alwaysApply: false
+---
+
+# DBT Layer Responsibilities
+
+This rule defines the distinct responsibilities and purposes of the three main dbt layers: staging, intermediate, and marts. Following these guidelines ensures clean architecture, maintainable models, and clear separation of concerns.
+
+## Overview
+
+In dbt, the staging and intermediate layers serve very different but complementary roles. Think of them as rungs on a ladder from raw source data to clean, business-ready marts.
+
+## 🟦 Staging Layer (stg\_\*)
+
+**Purpose:**
+The staging layer is the first transformation stop after raw data is ingested. Its responsibility is to clean up and standardize source tables so they're easier to work with downstream.
+
+**File Naming Convention:** `stg_[source_name]__table_name.sql`
+
+**Typical Responsibilities:**
+
+- One-to-one mapping with source tables (stg\_\* models usually mirror a raw table)
+- Rename cryptic column names into something human-readable
+- Apply basic type casting (e.g., strings to dates, integers to booleans)
+- Normalize column conventions (snake_case, consistent naming)
+- Add basic derived columns (e.g., parsed timestamps, surrogate keys)
+- Handle simple deduplication or removing obvious junk records
+- Basic data quality checks (null handling, format validation)
+
+**What NOT to do in staging:**
+
+- Complex business logic
+- Multi-table joins
+- Heavy aggregations
+- Final metric calculations
+- **Schema alignment for UNIONs** (this belongs in intermediate layer)
+
+**Important: Schema Alignment Principle**
+
+When you have multiple sources that will be UNIONed together (e.g., Veeva Network + OpenData):
+
+- ✅ **Staging**: Each staging model represents its source table one-to-one
+- ✅ **Staging**: Use the actual column names from each source
+- ❌ **Staging**: Don't add NULL columns just to match another source's schema
+- ✅ **Intermediate**: Handle schema alignment with explicit CAST(NULL AS type) for missing fields
+
+**Example:**
+
+```sql
+-- ✅ GOOD: stg_vn_hco.sql (Network has top_parent)
+select
+    top_parent__v as top_parent
+from source
+
+-- ✅ GOOD: stg_hco.sql (OpenData doesn't have top_parent, so don't add it)
+select
+    -- No top_parent column here!
+from source
+
+-- ✅ GOOD: int_hco_unified.sql (Intermediate adds NULL for OpenData)
+select
+    cast(null as varchar) as top_parent  -- Add missing column for UNION
+from {{ ref('stg_hco') }}
+```
+
+**Analogy:** It's like tidying raw ingredients—washing veggies, measuring spices, trimming fat—before you start cooking.
+
+## 🟩 Intermediate Layer (int\_\*)
+
+**Purpose:**
+The intermediate layer is a semantic modeling step between staging and marts. It's where you start blending data from multiple staging models to represent logical business entities or concepts.
+
+**File Naming Convention:** `int_[business_concept]__description.sql`
+
+**Typical Responsibilities:**
+
+- Joins across staging tables (e.g., linking customers to transactions, products, campaigns)
+- Introduce business logic that is too complex or heavy for staging, but not yet at the "final metric" level
+- Create reusable building blocks: dimensions and fact-like datasets that downstream marts can leverage
+- Filter/aggregate to the level of business concepts (e.g., "active customers," "first orders," "product hierarchy")
+- Enforce consistency by centralizing common transformations instead of repeating them in multiple marts
+- Apply business rules and logic (e.g., customer status calculations, product categorization)
+- **Schema alignment for UNIONs** (normalize columns from different sources)
+- **Deduplication logic** (e.g., "Network overrides OpenData")
+- **Enrichment joins** (LEFT JOIN to preserve all records while adding attributes)
+
+**What NOT to do in intermediate:**
+
+- Final reporting metrics or KPIs
+- Complex aggregations meant for end-user consumption
+- Presentation-layer formatting
+- Direct exposure to business users
+
+**Analogy:** This is your mise en place—assembling ingredients into usable prep bowls. You're not plating the dish yet, but you've got sautéed onions, a simmering sauce, and chopped herbs ready.
+
+## 🟨 Marts Layer (dim*\*, fct*\*)
+
+**Purpose:**
+The marts layer represents the final, business-ready datasets that are exposed to end users, reports, and BI tools. These are the "finished products" of the dbt transformation pipeline.
+
+**File Naming Conventions:**
+
+- Dimensions: `dim_[entity]__description.sql`
+- Facts: `fct_[business_process]__description.sql`
+
+**Typical Responsibilities:**
+
+- Final aggregations and calculations
+- Business metrics and KPIs
+- Data at the right grain for reporting
+- Optimized for query performance
+- Ready for BI tools and end-user consumption
+- Apply final business logic and formatting
+
+**What to consider:**
+
+- Query performance optimization
+- Appropriate data types for reporting tools
+- Clear column names for business users
+- Documentation for business stakeholders
+
+## 🚦 Decision Framework
+
+When creating a new model, ask:
+
+1. **Is this cleaning raw data into a usable form?** → Staging layer
+2. **Is this combining sources or applying business definitions?** → Intermediate layer
+3. **Is this creating final metrics or reporting outputs?** → Marts layer
+
+## 📋 Validation Checklist
+
+When reviewing dbt models:
+
+### Staging Models:
+
+- [ ] One-to-one relationship with source tables?
+- [ ] Only basic cleaning and type casting?
+- [ ] No complex joins or business logic?
+- [ ] Clear column naming conventions?
+- [ ] Basic data quality applied?
+
+### Intermediate Models:
+
+- [ ] Building on staging models only?
+- [ ] Creating reusable business concepts?
+- [ ] Appropriate level of aggregation?
+- [ ] No final reporting metrics?
+- [ ] Business logic clearly documented?
+
+### Mart Models:
+
+- [ ] Using intermediate models as sources?
+- [ ] Final, consumable format?
+- [ ] Clear for business users?
+- [ ] Performance optimized?
+- [ ] Well documented for stakeholders?
+
+## 💡 Best Practices
+
+1. **Skip intermediate if simple:** Some teams skip the intermediate layer if their models are simple, but in mature dbt projects it's invaluable for avoiding duplication and making business logic explicit.
+
+2. **Dependencies flow downward:** Staging → Intermediate → Marts. Never go upward against this flow.
+
+3. **Keep staging simple:** The staging layer should be as lightweight as possible. Move complex logic to intermediate where it can be tested and reused.
+
+4. **Document business logic:** Any non-obvious business rules should be clearly documented in intermediate models.
+
+5. **Test incrementally:** Test at each layer to catch issues early in the transformation pipeline.
+
+## 🏗️ Example Project Structure
+
+```
+models/
+├── staging/
+│   ├── stg_customers__raw.sql
+│   ├── stg_orders__raw.sql
+│   └── stg_products__raw.sql
+├── intermediate/
+│   ├── int_customer_orders__joined.sql
+│   ├── int_active_customers__filtered.sql
+│   └── int_product_hierarchy__categorized.sql
+└── marts/
+    ├── dim_customers__active.sql
+    ├── dim_products__categorized.sql
+    └── fct_orders__aggregated.sql
+```
