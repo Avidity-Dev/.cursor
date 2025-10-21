@@ -4,31 +4,74 @@
 
 Create a well-structured pull request using GitHub CLI with proper description, avoiding shell parsing issues that can occur with complex markdown in command-line arguments.
 
-## Steps
+**For PR content and writing guidelines, see:** [pr-writing-guidelines.mdc](mdc:.cursor/rules/general/pr-writing-guidelines.mdc)
 
-1. **Prepare branch**
+## Recommended Workflow
 
-   - Ensure all changes are committed and pushed
-   - Verify branch is up to date with main/base branch
-   - Check that tests are passing locally
+### 1. Prepare Branch
 
-2. **Use simple title and description for CLI**
+- Ensure all changes are committed and pushed
+- Verify branch is up to date with base branch
+- Check that tests are passing locally
 
-   - Keep PR title concise and descriptive
-   - Use simple description without backticks or complex formatting
-   - Avoid special characters that confuse shell parsing
+### 2. Write PR Description (recommended)
 
-3. **Create PR with basic info**
+Write your PR description in a file following the [PR writing guidelines](mdc:.cursor/rules/general/pr-writing-guidelines.mdc):
 
-   ```bash
-   gh pr create --title "feat: brief description" --body "Simple description without complex formatting"
-   ```
+```bash
+# Create description file in docs/plans/ for documentation
+cat > docs/plans/PR<number>_<brief_name>.md << 'EOF'
+## Overview
+Brief paragraph...
 
-4. **Enhance PR description via web interface**
-   - Open PR in GitHub web interface
-   - Add detailed markdown formatting safely
-   - Include code blocks, tables, and complex formatting
-   - Add screenshots, links, and rich content
+## Changes
+...
+
+## Rationale
+...
+
+## Breaking Changes
+None.
+EOF
+```
+
+**Note:** The file should start with `## Overview`, not a title. The title is passed separately via `--title` flag.
+
+Benefits:
+
+- Avoids all shell parsing issues
+- Allows rich markdown formatting
+- Documents PR for future reference
+- Can be reviewed and edited before creating PR
+
+### 3. Create PR with Description File
+
+```bash
+gh pr create \
+  --base main \
+  --title "Brief descriptive title" \
+  --body-file docs/plans/PR<number>_<brief_name>.md
+```
+
+### 4. Verify and Adjust
+
+- Review PR in GitHub web interface
+- Make any final adjustments to description
+- Assign reviewers, add labels
+- Link related issues
+
+## Alternative: Simple PR Creation
+
+For simple PRs where a file isn't needed:
+
+```bash
+gh pr create \
+  --base main \
+  --title "Brief title" \
+  --body "Simple single-line description"
+```
+
+Then enhance via web interface if needed.
 
 ## Common Shell Parsing Issues to Avoid
 
@@ -40,32 +83,49 @@ Create a well-structured pull request using GitHub CLI with proper description, 
 
 ## PR Creation Checklist
 
-- [ ] Branch pushed to remote
-- [ ] Simple, clear title chosen
-- [ ] Basic description prepared (no backticks/complex formatting)
-- [ ] PR created successfully with `gh pr create`
-- [ ] Enhanced description added via web interface
-- [ ] Appropriate reviewers assigned
-- [ ] Labels and milestone added if needed
+**Before creating:**
+
+- [ ] All changes committed and pushed to remote
+- [ ] Tests passing locally
+- [ ] PR description written (following [guidelines](mdc:.cursor/rules/general/pr-writing-guidelines.mdc))
+
+**When creating:**
+
+- [ ] Clear, specific title chosen
+- [ ] Correct base branch specified
+- [ ] Description file created in `docs/plans/` (for complex PRs)
+- [ ] PR created successfully with `gh pr create --body-file`
+
+**After creating:**
+
+- [ ] PR reviewed in web interface
+- [ ] Reviewers assigned
+- [ ] Labels added
 - [ ] Related issues linked
+- [ ] Milestone set (if applicable)
 
-## Alternative Approach for Complex Descriptions
+## Quick Reference
 
-If you need to include complex formatting immediately:
+**Create PR with file:**
 
-1. **Create description file**
+```bash
+gh pr create --base main --title "Title" --body-file docs/plans/PR123_feature.md
+```
 
-   ```bash
-   cat > /tmp/pr-description.md << 'EOF'
-   ## Your complex markdown here
-   - With `code blocks`
-   - And special characters
-   EOF
-   ```
+**Create simple PR:**
 
-2. **Use file for body**
-   ```bash
-   gh pr create --title "Your title" --body-file /tmp/pr-description.md
-   ```
+```bash
+gh pr create --base main --title "Title" --body "Simple description"
+```
 
-This avoids all shell parsing issues while allowing rich formatting.
+**Update PR description:**
+
+```bash
+gh pr edit 123 --body-file docs/plans/PR123_feature.md
+```
+
+**Change base branch:**
+
+```bash
+gh pr edit 123 --base main
+```
