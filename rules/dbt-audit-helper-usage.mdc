@@ -1,0 +1,381 @@
+---
+description: Comprehensive guide for using dbt audit_helper package for data validation and comparison
+alwaysApply: false
+---
+
+# dbt Audit Helper Usage Guide
+
+## Overview
+
+The dbt audit_helper package provides powerful macros for comparing data between different versions of dbt models, validating migrations, and identifying data discrepancies. This guide provides a practical decision tree for choosing the right macro for your use case.
+
+## Installation
+
+Add to `packages.yml`:
+
+```yaml
+packages:
+  - package: dbt-labs/audit_helper
+    version: 0.4.0
+```
+
+Then run: `dbt deps`
+
+## Decision Tree: Which Macro Should I Use?
+
+### 1. Quick Identity Checks (Snowflake/BigQuery Only)
+
+**When**: Need a simple yes/no answer - did anything change?
+
+- **`quick_are_relations_identical`** - Compare two dbt relations
+- **`quick_are_queries_identical`** - Compare two SQL queries
+
+```sql
+-- Quick check if tables are identical
+{{ audit_helper.quick_are_relations_identical(
+    a_relation=ref('old_model'),
+    b_relation=ref('new_model')
+) }}
+```
+
+**Speed**: ⚡ Fastest (hash-based comparison)
+**Returns**: Boolean (true/false)
+
+### 2. Row Count Validation
+
+**When**: First step in auditing - check if row counts match
+
+- **`compare_row_counts`**
+
+```sql
+-- Check if row counts match
+{{ audit_helper.compare_row_counts(
+    a_relation=ref('old_model'),
+    b_relation=ref('new_model')
+) }}
+```
+
+**Speed**: ⚡ Very fast
+**Returns**: Simple count comparison
+
+### 3. Row-Level Comparison
+
+**When**: Need to know which rows don't match or exist in only one table
+
+- **`compare_relations`** - Compare two dbt relations directly
+- **`compare_queries`** - Compare two SQL queries (use when you need transformations)
+
+```sql
+-- Compare relations with primary key
+{{ audit_helper.compare_relations(
+    a_relation=ref('old_model'),
+    b_relation=ref('new_model'),
+    primary_key="id",
+    exclude_columns=["updated_at"]
+) }}
+
+-- Compare queries (when you need to transform data)
+{% set old_query %}
+    select id, name, status from old_schema.table
+{% endset %}
+
+{% set new_query %}
+    select id, name, status from {{ ref('new_model') }}
+{% endset %}
+
+{{ audit_helper.compare_queries(
+    a_query=old_query,
+    b_query=new_query,
+    primary_key="id"
+) }}
+```
+
+**Speed**: 🔄 Medium
+**Returns**: Row categorization (identical, only in A, only in B, different)
+
+### 4. Column-Level Analysis
+
+**When**: Found mismatches and need to identify which columns are problematic
+
+#### A. Check ALL columns at once:
+
+**`compare_all_columns`**
+
+```sql
+-- Compare all columns with detailed output
+{{ audit_helper.compare_all_columns(
+    a_relation=ref('old_model'),
+    b_relation=ref('new_model'),
+    primary_key="id",
+    exclude_columns=["updated_at", "loaded_at"],
+    summarize=false  -- Show actual conflicting values
+) }}
+
+-- Summary view (default)
+{{ audit_helper.compare_all_columns(
+    a_relation=ref('old_model'),
+    b_relation=ref('new_model'),
+    primary_key="id",
+    summarize=true  -- Just counts per column
+) }}
+```
+
+**Speed**: 🔄 Medium
+**Returns**: Per-column match statistics or row-level details
+
+#### B. Deep dive into ONE column:
+
+**`compare_column_values`**
+
+```sql
+-- Analyze specific column in detail
+{{ audit_helper.compare_column_values(
+    a_query=old_query,
+    b_query=new_query,
+    primary_key="id",
+    column_to_compare="address",
+    emojis=true,
+    a_relation_name="old_data",
+    b_relation_name="new_data"
+) }}
+```
+
+**Speed**: ⚡ Fast
+**Returns**: Detailed breakdown of one column's match status
+
+#### C. Quick column screening:
+
+**`compare_which_relation_columns_differ`**
+
+```sql
+-- Find which columns have ANY differences
+{{ audit_helper.compare_which_relation_columns_differ(
+    a_relation=ref('old_model'),
+    b_relation=ref('new_model'),
+    primary_key="id"
+) }}
+```
+
+**Speed**: ⚡ Fast
+**Returns**: List of column names that differ
+
+### 5. Schema Structure Comparison
+
+**When**: Debugging schema mismatches, column order, or data type issues
+
+- **`compare_relation_columns`**
+
+```sql
+-- Compare schema structure
+{{ audit_helper.compare_relation_columns(
+    a_relation=ref('old_model'),
+    b_relation=ref('new_model')
+) }}
+```
+
+**Speed**: ⚡ Very fast
+**Returns**: Column names, data types, ordinal positions comparison
+
+### 6. Change Classification
+
+**When**: Need to understand how each row changed
+
+- **`compare_and_classify_relation_results`**
+- **`compare_and_classify_query_results`**
+
+```sql
+-- Classify changes by row
+{{ audit_helper.compare_and_classify_relation_results(
+    a_relation=ref('old_model'),
+    b_relation=ref('new_model'),
+    primary_key_columns=["id"],
+    columns=["id", "name", "status"],
+    sample_limit=50
+) }}
+```
+
+**Speed**: 🐌 Slower
+**Returns**: Each row tagged as added/removed/identical/modified
+
+## Recommended Workflow for Data Validation
+
+### Step 1: Quick Row Count Check
+
+```sql
+{{ audit_helper.compare_row_counts(
+    a_relation=ref('old_model'),
+    b_relation=ref('new_model')
+) }}
+```
+
+### Step 2: Find Which Rows Differ
+
+```sql
+{{ audit_helper.compare_queries(
+    a_query=old_query,
+    b_query=new_query,
+    primary_key="id"
+) }}
+```
+
+### Step 3: Identify Problem Columns
+
+```sql
+{{ audit_helper.compare_all_columns(
+    a_relation=ref('old_model'),
+    b_relation=ref('new_model'),
+    primary_key="id",
+    exclude_columns=['updated_at', 'loaded_at'],
+    summarize=false
+) }}
+```
+
+### Step 4: Deep Dive into Specific Column (if needed)
+
+```sql
+{{ audit_helper.compare_column_values(
+    a_query=old_query,
+    b_query=new_query,
+    primary_key="id",
+    column_to_compare="problematic_column"
+) }}
+```
+
+## Using as dbt Tests
+
+### Custom Singular Test
+
+```sql
+-- tests/compare_old_vs_new.sql
+{{
+  audit_helper.compare_all_columns(
+    a_relation=ref('old_model'),
+    b_relation=api.Relation.create(
+        database='your_db',
+        schema='your_schema',
+        identifier='old_model'
+    ),
+    exclude_columns=['updated_at'],
+    primary_key='id',
+    summarize=false
+  )
+}}
+where conflicting_values
+```
+
+### Test with Additional Context
+
+```sql
+-- tests/compare_with_context.sql
+with base_test as (
+  {{
+    audit_helper.compare_all_columns(
+      a_relation=ref('new_model'),
+      b_relation=api.Relation.create(
+          database='prod_db',
+          schema='analytics_prod',
+          identifier='old_model'
+      ),
+      exclude_columns=['updated_at'],
+      primary_key='id',
+      summarize=false
+    )
+  }}
+  left join {{ ref('new_model') }} using(id)
+  where conflicting_values or missing_from_a or missing_from_b
+)
+select
+  status,
+  count(distinct case when conflicting_values then id end) as conflicting_count,
+  count(distinct case when missing_from_a then id end) as missing_from_new_count,
+  count(distinct case when missing_from_b then id end) as missing_from_old_count
+from base_test
+group by 1
+having count(*) > 0
+```
+
+## Advanced Usage Patterns
+
+### Logging Results for dbt Cloud
+
+```sql
+-- Custom macro for dbt Cloud logging
+{% macro print_audit_output() %}
+{%- set columns_to_compare = adapter.get_columns_in_relation(ref('your_model')) -%}
+
+{% set old_query %}
+    select * from old_schema.your_table
+{% endset %}
+
+{% set new_query %}
+    select * from {{ ref('your_model') }}
+{% endset %}
+
+{% if execute %}
+    {% for column in columns_to_compare %}
+        {{ log('Comparing column "' ~ column.name ~ '"', info=True) }}
+        {% set audit_query = audit_helper.compare_column_values(
+                a_query=old_query,
+                b_query=new_query,
+                primary_key="id",
+                column_to_compare=column.name
+        ) %}
+        {% set audit_results = run_query(audit_query) %}
+        {% do log(audit_results.column_names, info=True) %}
+        {% for row in audit_results.rows %}
+            {% do log(row.values(), info=True) %}
+        {% endfor %}
+    {% endfor %}
+{% endif %}
+{% endmacro %}
+```
+
+### Store Test Failures
+
+```bash
+# Run tests and store failures for analysis
+dbt test --select compare_old_vs_new --store-failures
+```
+
+## Performance Considerations
+
+- **Quick checks** (hash-based) are fastest but only work on Snowflake/BigQuery
+- **Row count** comparisons are very fast and work everywhere
+- **Column-level analysis** is medium speed but provides detailed insights
+- **Change classification** is slower but gives comprehensive change tracking
+
+## Common Use Cases
+
+1. **Migration Validation**: Compare old ETL vs new dbt models
+2. **Refactoring Verification**: Ensure logic changes didn't break data
+3. **Data Quality Audits**: Identify discrepancies between expected and actual data
+4. **Schema Evolution**: Validate structural changes don't break downstream models
+5. **Address Matching Validation**: Perfect for validating exact address matching changes
+
+## Quick Reference
+
+| Macro                                   | Use When               | Output                | Speed        | Requirements            |
+| --------------------------------------- | ---------------------- | --------------------- | ------------ | ----------------------- |
+| `quick_are_*_identical`                 | Need yes/no answer     | Boolean               | ⚡ Fastest   | Snowflake/BigQuery only |
+| `compare_row_counts`                    | Check counts match     | Count comparison      | ⚡ Very fast | None                    |
+| `compare_relations/queries`             | Find different rows    | Row categorization    | 🔄 Medium    | Primary key             |
+| `compare_all_columns`                   | Find different columns | All column stats      | 🔄 Medium    | Primary key             |
+| `compare_column_values`                 | Analyze one column     | Single column detail  | ⚡ Fast      | Primary key             |
+| `compare_which_relation_columns_differ` | Quick column scan      | Column names list     | ⚡ Fast      | Primary key             |
+| `compare_relation_columns`              | Check schema           | Schema comparison     | ⚡ Very fast | None                    |
+| `compare_and_classify_*`                | Understand changes     | Change classification | 🐌 Slower    | Primary key             |
+
+## Best Practices
+
+1. **Start with quick checks** - Use row counts and identity checks first
+2. **Use primary keys** - Most macros require them for accurate comparison
+3. **Exclude metadata columns** - Filter out `updated_at`, `loaded_at`, etc.
+4. **Test incrementally** - Start with small samples, then full datasets
+5. **Store failures** - Use `--store-failures` to analyze test results
+6. **Document your tests** - Explain what you're validating and why
+
+## Integration with Existing dbt Patterns
+
+- Use with [dbt Data Layer Rules](mdc:stack/dbt-data-layer) for proper layer responsibilities
+- Follow [COALESCE Best Practices](mdc:transforms/models/coalesce-best-practices) when handling NULL values in comparisons
+- Integrate with existing schema tests in `models/schema.yml`
