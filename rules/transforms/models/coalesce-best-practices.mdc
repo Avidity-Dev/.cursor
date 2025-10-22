@@ -1,0 +1,156 @@
+---
+description: When to use COALESCE in SQL/dbt models - best practices and anti-patterns
+globs: *.sql
+---
+
+# COALESCE Best Practices in dbt Models
+
+## When to Use COALESCE
+
+### 1. LEFT JOIN Handling (✅ Essential)
+
+Always use COALESCE when LEFT JOINs can produce NULLs:
+
+```sql
+-- ✅ GOOD: Provide safe defaults for optional joined data
+left join ownership o on a.hco_vid = o.hco_vid
+select
+    coalesce(o.top_owner_hcp_count, 0) as top_owner_hcp_count,
+    coalesce(o.top_owner_is_key_network, 0) as is_key_network
+```
+
+### 2. String Concatenation (✅ Essential)
+
+Use COALESCE to prevent NULL propagation in string operations:
+
+```sql
+-- ✅ GOOD: Prevent NULL from breaking concatenation
+coalesce(city, '') || ', ' || coalesce(state, '') || ' ' || coalesce(postal_code, '')
+```
+
+### 3. Weighted Score Calculations (✅ Essential)
+
+Protect arithmetic operations where NULL would nullify the entire expression:
+
+```sql
+-- ✅ GOOD: Ensure missing components contribute 0, not NULL
+(
+    coalesce(relevance_score, 0) * 0.3 +
+    coalesce(hcp_count, 0) * 10.0 +
+    coalesce(kol_count, 0) * 15.0
+) as composite_score
+```
+
+### 4. Business Defaults (✅ Good)
+
+Provide meaningful defaults for missing values:
+
+```sql
+-- ✅ GOOD: Map unknown values to documented sentinel
+coalesce(status_map.canonical_value, 'Unknown') as hcp_status
+```
+
+## When NOT to Use COALESCE
+
+### 1. Upstream Already Handles NULLs (⚠️ Redundant)
+
+If upstream models already apply COALESCE, don't repeat it:
+
+```sql
+-- ❌ BAD: Upstream hco_plus_hcp already applies COALESCE
+select
+    coalesce(hcp_count, 0) as hcp_count,  -- Redundant!
+from {{ ref('hco_plus_hcp') }}  -- This already has COALESCE applied
+
+-- ✅ GOOD: Trust upstream contract
+select
+    hcp_count  -- Already guaranteed non-NULL by upstream
+from {{ ref('hco_plus_hcp') }}
+```
+
+### 2. Defense-in-Depth in Marts (⚠️ Document if Used)
+
+If you intentionally add redundant COALESCE for safety, document why:
+
+```sql
+-- ✅ ACCEPTABLE: Documented defense-in-depth
+-- NOTE: COALESCE here is redundant (upstream already applies COALESCE)
+-- but kept as defense-in-depth for this mart layer to ensure NULL never propagates
+coalesce(score, 0) * weight
+```
+
+### 3. Explicit NULL Checks (⚠️ Unnecessary)
+
+Don't use COALESCE when you're checking for NULL:
+
+```sql
+-- ❌ BAD: Redundant
+where coalesce(field, 0) = 0
+
+-- ✅ GOOD: Explicit check
+where field is null or field = 0
+```
+
+## Decision Framework
+
+Ask yourself:
+
+1. **Am I reading from a raw source?** → CAST it (staging layer)
+2. **Am I doing arithmetic that NULL would break?** → COALESCE it
+3. **Am I concatenating strings?** → COALESCE each component
+4. **Upstream already guarantees non-NULL?** → Don't COALESCE (or document defense-in-depth)
+5. **Am I just passing data through?** → Don't COALESCE
+
+## Layer-Specific Guidelines
+
+### Staging Layer (`stg_*`)
+
+- **DO**: CAST everything to canonical types
+- **DO**: COALESCE optional fields from LEFT JOINs
+- **DO**: Provide defaults for raw data quality issues
+
+### Intermediate Layer (`int_*`, `mdm_*`)
+
+- **DO**: Inherit types from staging (don't re-cast)
+- **DO**: COALESCE only when computing new values
+- **DON'T**: Redundantly COALESCE upstream-guaranteed fields
+
+### Marts Layer (`dim_*`, `fact_*`)
+
+- **DO**: Enforce contracts with explicit CAST if needed
+- **MAY**: Add defense-in-depth COALESCE for production resilience
+- **MUST**: Document redundant COALESCE if you add it
+
+## Anti-Patterns
+
+### Cargo Cult Casting
+
+```sql
+-- ❌ BAD: Casting "because we always do"
+select
+    coalesce(field1, 0) as field1,
+    coalesce(field2, 0) as field2,
+    coalesce(field3, 0) as field3
+-- Upstream guarantees these are non-NULL!
+```
+
+### Defensive Casting Without Trust
+
+```sql
+-- ❌ BAD: Not trusting upstream
+select
+    coalesce(upstream.already_coalesced_field, 0) as field
+-- Fix upstream instead of masking everywhere!
+```
+
+## Key Principle
+
+**Fail-fast for correctness, defense-in-depth for resilience.**
+
+- Use fail-fast (no COALESCE) to build trust and expose issues during development
+- Add defense-in-depth (with COALESCE) selectively for production-critical tables where resilience matters more than failing loudly
+
+## References
+
+- See [Type Casting Guidelines](mdc:transforms/models/CLAUDE.md) for broader type handling patterns
+- See [dbt Data Layer Rules](mdc:stack/dbt-data-layer) for layer responsibilities
