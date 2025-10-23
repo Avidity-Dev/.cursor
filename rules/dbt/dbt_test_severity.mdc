@@ -1,0 +1,374 @@
+---
+description: Guidelines for deciding test severity (ERROR vs WARN) in dbt tests
+---
+
+# dbt Test Severity Guidelines
+
+## Philosophy
+
+**Branch deployments should match production behavior** to catch integration issues before merging.
+
+Local development should be flexible to allow rapid iteration.
+
+## Project-Level Configuration
+
+Recommended dbt_project.yml configuration:
+
+```yaml
+tests:
+  transforms:
+    # Local only: flexible iteration (warnings)
+    # Test/Branch/Prod: strict validation (errors)
+    +severity: "{{ 'warn' if target.name == 'local' else 'error' }}"
+    +store_failures: true
+```
+
+**Why this pattern?**
+
+- **Local (`--target local`)**: Warnings allow you to iterate without fixing every test
+- **Test/Branch/Prod**: Errors catch issues before they reach production
+- **Branch = Integration Testing**: Find problems in CI, not after merge
+
+## ERROR vs WARN Decision Matrix
+
+### ⚠️ Should be ERROR (Block Deployment)
+
+Use `error` severity for tests that catch **data integrity violations**:
+
+| Test Category               | Examples                                       | Why ERROR                               |
+| --------------------------- | ---------------------------------------------- | --------------------------------------- |
+| **Primary Keys**            | `unique`, `not_null` on ID columns             | Breaks joins, corrupts downstream       |
+| **Foreign Keys**            | `relationships` tests                          | Orphaned records cause integrity issues |
+| **Contract Fields**         | `accepted_values` on `source_system`, `status` | Consumers depend on these contracts     |
+| **Critical Business Logic** | Flags, enums with known stable values          | Wrong values → incorrect decisions      |
+| **Referential Integrity**   | Cross-table consistency checks                 | Data lineage breaks                     |
+
+**Characteristics of ERROR-worthy tests:**
+
+- ✓ Stable, predictable expected values
+- ✓ Violations indicate bugs or pipeline failures
+- ✓ Downstream systems/users depend on these guarantees
+- ✓ Failure requires immediate investigation
+
+### ✅ Should be WARN (Monitor But Don't Block)
+
+Use `warn` severity for tests that catch **data quality concerns**:
+
+| Test Category         | Examples                                     | Why WARN                                        |
+| --------------------- | -------------------------------------------- | ----------------------------------------------- |
+| **Data Availability** | Row count thresholds, recent data checks     | Missing data is bad but shouldn't stop pipeline |
+| **Soft Validation**   | Optional fields, "nice to have" patterns     | Informational only                              |
+| **Transient Issues**  | Checks on incremental loads during migration | May temporarily violate                         |
+| **Expected Patterns** | Business rules with known exceptions         | Guidelines, not hard requirements               |
+
+**Characteristics of WARN-worthy tests:**
+
+- ✓ Values may legitimately fluctuate
+- ✓ Violations need investigation but aren't critical
+- ✓ Historical context matters (is this a new pattern?)
+- ✓ Acceptable to temporarily violate during migrations
+
+## How to Explicitly Set Severity
+
+### Test-Level Override (Most Specific)
+
+```yaml
+columns:
+  - name: source_system
+    tests:
+      - accepted_values:
+          config:
+            severity: error # ← Explicit override
+          arguments:
+            values: ["opendata", "veeva_network"]
+```
+
+### Model-Level Configuration
+
+```yaml
+models:
+  - name: stg_critical_data
+    config:
+      severity: error # All tests on this model default to error
+    columns:
+      - name: id
+        tests:
+          - unique
+          - not_null
+```
+
+### Named Test with Severity
+
+```yaml
+tests:
+  - dbt_utils.expression_is_true:
+      config:
+        severity: warn # ← Monitoring only
+        alias: stg_od_hcp_has_recent_data
+      arguments:
+        expression: "(SELECT MAX(loaded_at) FROM {{ ref('stg_od_hcp') }}) > CURRENT_DATE - 7"
+```
+
+## Common Patterns
+
+### Pattern 1: Primary Key Integrity (ERROR)
+
+```yaml
+columns:
+  - name: hcp_vid
+    description: Primary key
+    tests:
+      - unique # Inherits ERROR from project config
+      - not_null # Inherits ERROR from project config
+```
+
+### Pattern 2: Foreign Key Integrity (ERROR)
+
+```yaml
+columns:
+  - name: hco_vid
+    description: Foreign key to HCO dimension
+    tests:
+      - relationships: # Inherits ERROR from project config
+          to: ref('dim_hco')
+          field: hco_vid
+```
+
+### Pattern 3: Contract Enforcement (ERROR)
+
+```yaml
+columns:
+  - name: source_system
+    description: Source system identifier
+    tests:
+      - not_null # Inherits ERROR
+      - accepted_values: # Inherits ERROR
+          arguments:
+            values: ["opendata", "veeva_network", "crm"]
+```
+
+### Pattern 4: Data Availability (WARN)
+
+```yaml
+tests:
+  - dbt_utils.expression_is_true:
+      config:
+        severity: warn # ← Explicit override to WARN
+        alias: stg_od_hcp_minimum_row_count
+      arguments:
+        expression: "(SELECT COUNT(*) FROM {{ ref('stg_od_hcp') }}) > 1000"
+```
+
+### Pattern 5: Optional Field Validation (WARN)
+
+```yaml
+columns:
+  - name: specialty
+    description: HCP specialty (may be NULL for some HCPs)
+    tests:
+      - accepted_values:
+          config:
+            severity: warn # ← Explicit override
+            where: "specialty is not null" # Only validate non-NULL
+          arguments:
+            values: ["Cardiology", "Neurology", "Oncology"]
+```
+
+## Decision Flowchart
+
+When adding a test, ask yourself:
+
+```
+Is this field used by downstream consumers?
+├─ YES: Is it a contract (stable, known values)?
+│  ├─ YES: ERROR ⚠️
+│  └─ NO: Does it affect data integrity?
+│     ├─ YES: ERROR ⚠️
+│     └─ NO: WARN ✅
+└─ NO: Is it for monitoring/alerting only?
+   ├─ YES: WARN ✅
+   └─ NO: Is it a primary/foreign key?
+      ├─ YES: ERROR ⚠️
+      └─ NO: Default to WARN ✅
+```
+
+## Layer-Specific Guidelines
+
+### Staging Layer (`stg_*`)
+
+**Default**: ERROR (strict validation at data entry point)
+
+Tests that should be ERROR:
+
+- Primary key uniqueness and nullability
+- Source system field contracts
+- NOT NULL on critical fields
+- Referential integrity from raw sources
+
+Tests that can be WARN:
+
+- Row count thresholds
+- Data freshness checks
+- Optional field validation
+
+### Intermediate Layer (`int_*`, `mdm_*`)
+
+**Default**: ERROR (business logic integrity)
+
+Tests that should be ERROR:
+
+- Deduplication logic validation
+- Join integrity
+- Computed flags with known values
+- Business rule enforcement
+
+Tests that can be WARN:
+
+- Coverage metrics ("% of HCPs with specialty")
+- Aggregation reasonability checks
+
+### Marts Layer (`dim_*`, `fact_*`)
+
+**Default**: ERROR (consumer contract enforcement)
+
+Tests that should be ERROR:
+
+- Dimensional integrity (surrogate keys, slowly changing dimensions)
+- Fact table referential integrity
+- Grain validation
+- Contract field values
+
+Tests that can be WARN:
+
+- Metric thresholds
+- Historical comparison checks
+
+## Anti-Patterns
+
+### ❌ DON'T: Make everything WARN to avoid dealing with failures
+
+```yaml
+# ❌ BAD: Masking real issues
+tests:
+  transforms:
+    +severity: warn # Nothing blocks deployment!
+```
+
+**Why it's bad**: Tests become noise, not signals. Data quality degrades.
+
+### ❌ DON'T: Make everything ERROR and skip tests in CI
+
+```yaml
+# ❌ BAD: Tests are so strict they're ignored
+tests:
+  transforms:
+    +severity: error
+# Then in CI: dbt build --exclude test_type:generic
+```
+
+**Why it's bad**: You've defeated the purpose of testing.
+
+### ❌ DON'T: Set severity without considering the failure mode
+
+```yaml
+# ❌ BAD: No thought about what failure means
+- accepted_values:
+    config:
+      severity: error # Is this really critical?
+    arguments:
+      values: [...]
+```
+
+**Why it's bad**: Every test failure is treated the same (critical).
+
+## Best Practices
+
+### ✅ DO: Use project config as the default, override explicitly
+
+```yaml
+# dbt_project.yml: Default to ERROR for non-local
+tests:
+  transforms:
+    +severity: "{{ 'warn' if target.name == 'local' else 'error' }}"
+
+# schema.yml: Override only when needed
+tests:
+  - dbt_utils.expression_is_true:
+      config:
+        severity: warn  # ← Intentional downgrade
+```
+
+### ✅ DO: Document why a test is WARN instead of ERROR
+
+```yaml
+- accepted_values:
+    config:
+      severity: warn # ← Monitoring during migration period
+      # TODO: Change to ERROR after opendata migration completes (2025-11-01)
+    arguments:
+      values: ["legacy", "opendata"]
+```
+
+### ✅ DO: Review test severity during code review
+
+Check:
+
+- [ ] Is severity appropriate for the failure mode?
+- [ ] Are ERROR tests truly critical?
+- [ ] Are WARN tests documented with why they're not ERROR?
+
+## Target-Specific Behavior
+
+### Local Development (`--target local`)
+
+```bash
+# Fast iteration, warnings don't block
+dbt build --target local --select my_model
+
+# Tests run but only warn on failure
+# Output: "Completed with 3 warnings"
+```
+
+### CI/Branch Deployment (`--target test` or `--target branch`)
+
+```bash
+# Strict validation, errors block deployment
+dbt build --target branch --select my_model
+
+# Tests fail hard, exit code 1
+# Deployment blocked until fixed
+```
+
+### Production (`--target prod`)
+
+```bash
+# Maximum strictness
+dbt build --target prod --select my_model
+
+# Any ERROR-severity test failure stops deployment
+# WARN tests are logged but don't block
+```
+
+## Migration Strategy
+
+If you're inheriting a codebase with inconsistent test severity:
+
+1. **Audit existing tests** - categorize by failure impact
+2. **Fix critical issues first** - get primary/foreign keys to ERROR
+3. **Set project-level default** - establish the pattern
+4. **Gradually raise bar** - convert WARN → ERROR as data quality improves
+5. **Document exceptions** - explain why specific tests are WARN
+
+## Summary
+
+**Key Principle**: Test severity should reflect the **business impact of failure**.
+
+- **ERROR**: Data integrity violations that break downstream systems
+- **WARN**: Data quality concerns that need investigation but aren't critical
+- **Local development**: Flexible (WARN)
+- **Branch/Prod**: Strict (ERROR by default, WARN by exception)
+
+When in doubt, ask: "If this test fails in production at 2 AM, should it page someone?"
+
+- YES → ERROR ⚠️
+- NO → WARN ✅
